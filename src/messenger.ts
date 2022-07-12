@@ -1,6 +1,6 @@
 import { Waku, WakuMessage } from "js-waku";
 
-export const sendMessage = async (message: string) => {
+export const messenger = async (message: string) => {
   const waku = await Waku.create({
     bootstrap: {
       default: true,
