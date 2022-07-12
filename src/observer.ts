@@ -6,7 +6,7 @@ export const startObserver = async () => {
       default: true,
     }
   });
-  
+
   await waku.waitForRemotePeer();
 
   waku.relay.addObserver(

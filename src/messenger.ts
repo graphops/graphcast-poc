@@ -10,8 +10,8 @@ export const sendMessage = async (message: string) => {
 
   const msg = await WakuMessage.fromUtf8String(
     message,
-    "/my-cool-app/123/my-use-case/proto"
+    "/my-cool-app/123/my-use-case/proto",
   );
-  
+
   await waku.relay.send(msg);
 };
