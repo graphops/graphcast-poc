@@ -1,0 +1,27 @@
+{
+  "name": "gossip-client",
+  "version": "0.0.1",
+  "description": "Gossip client for indexers",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint '*/**/*.ts'",
+    "test": "jest",
+    "watch": "tsc-watch --onSuccess \"npm start\"",
+    "start": "node ./dist/index.js"
+  },
+  "author": "axiomatic-aardvark",
+  "license": "ISC",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.30.6",
+    "@typescript-eslint/parser": "^5.30.6",
+    "eslint": "^8.19.0",
+    "tsc-watch": "^5.0.3",
+    "typescript": "^4.7.4",
+    "ts-jest": "^28.0.5",
+    "@types/jest": "^28.1.4",
+    "jest": "^28.1.2"
+  },
+  "dependencies": {
+    "js-waku": "^0.24.0"
+  }
+}
