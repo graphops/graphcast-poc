@@ -9,6 +9,7 @@ export class Messenger {
         default: true,
       },
     });
+    
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
   }

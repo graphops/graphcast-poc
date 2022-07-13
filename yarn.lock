@@ -613,9 +613,9 @@
   integrity sha512-Gptpue6qPmg7p1E5LBO5GDtXw5WMc2DVtUmu4EQequOcoCvum1dT9sY6s9M8aSJWq9YopCN4jmTOAvqMdw3q7w==
 
 "@noble/secp256k1@^1.3.0", "@noble/secp256k1@^1.3.4":
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/@noble/secp256k1/-/secp256k1-1.6.0.tgz#602afbbfcfb7e169210469b697365ef740d7e930"
-  integrity sha512-DWSsg8zMHOYMYBqIQi96BQuthZrp98LCeMNcUOaffCIVYQ5yxDbNikLF+H7jEnmNNmXbtVic46iCuVWzar+MgA==
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/@noble/secp256k1/-/secp256k1-1.6.1.tgz#6e58c353bda64f9f1ec6d4067af127e6528d5be6"
+  integrity sha512-htMgIaLATi5B4nQc6Y/0UF8hCpdGSsIQEptVpOBFfb75rC7K9tp9+rGogAXb/vWPwtzoBP2i8Ur/0PAieDI1vQ==
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
@@ -900,9 +900,9 @@
     "@types/istanbul-lib-report" "*"
 
 "@types/jest@^28.1.4":
-  version "28.1.4"
-  resolved "https://registry.yarnpkg.com/@types/jest/-/jest-28.1.4.tgz#a11ee6c8fd0b52c19c9c18138b78bbcc201dad5a"
-  integrity sha512-telv6G5N7zRJiLcI3Rs3o+ipZ28EnE+7EvF0pSrt2pZOMnAVI/f+6/LucDxOvcBcTeTL3JMF744BbVQAVBUQRA==
+  version "28.1.5"
+  resolved "https://registry.yarnpkg.com/@types/jest/-/jest-28.1.5.tgz#4337404efa059adbf96c4ac53b28fdc0af514475"
+  integrity sha512-TLAC2zXxGnohSP3GxgIyJn7yrTeRPDEyVFyCY1NE2wzg392auI+69uk5EPGjUXuhkq/K208J/TWpLG7J8ebIEQ==
   dependencies:
     jest-matcher-utils "^28.0.0"
     pretty-format "^28.0.0"
@@ -1331,9 +1331,9 @@ camelcase@^6.2.0:
   integrity sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==
 
 caniuse-lite@^1.0.30001359:
-  version "1.0.30001365"
-  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001365.tgz#72c2c3863b1a545cfd3d9953535bd2ee17568158"
-  integrity sha512-VDQZ8OtpuIPMBA4YYvZXECtXbddMCUFJk1qu8Mqxfm/SZJNSr1cy4IuLCOL7RJ/YASrvJcYg1Zh+UEUQ5m6z8Q==
+  version "1.0.30001366"
+  resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001366.tgz#c73352c83830a9eaf2dea0ff71fb4b9a4bbaa89c"
+  integrity sha512-yy7XLWCubDobokgzudpkKux8e0UOOnLHE6mlNJBzT3lZJz6s5atSEzjoL+fsCPkI0G8MP5uVdDx1ur/fXEWkZA==
 
 caseless@~0.12.0:
   version "0.12.0"
@@ -1599,9 +1599,9 @@ electron-fetch@^1.7.2:
     encoding "^0.1.13"
 
 electron-to-chromium@^1.4.172:
-  version "1.4.186"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.4.186.tgz#a811bba15f0868d3f4164b0f4ede8adc8773831b"
-  integrity sha512-YoVeFrGd/7ROjz4R9uPoND1K/hSRC/xADy9639ZmIZeJSaBnKdYx3I6LMPsY7CXLpK7JFgKQVzeZ/dk2br6Eaw==
+  version "1.4.187"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.4.187.tgz#b884493df00816dc2ce928958c4f6a51a93fe1a8"
+  integrity sha512-t3iFLHVIMhB8jGZ+8ui951nz6Bna5qKfhxezG3wzXdBJ79qFKPsE2chjjVFNqC1ewhfrPQrw9pmVeo4FFpZeQA==
 
 emittery@^0.10.2:
   version "0.10.2"

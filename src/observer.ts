@@ -1,8 +1,4 @@
-import { Waku, WakuMessage } from "js-waku";
-
-// type GossipMessage = {
-//   payload: string,
-// };
+import { Waku } from "js-waku";
 
 export class Observer {
   wakuInstance: Waku;
@@ -13,14 +9,14 @@ export class Observer {
         default: true,
       }
     });
-  
+
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
   }
 
-  observe(contentTopic: string, cb: (message: WakuMessage) => void): void {
+  observe(contentTopic: string, handler: () => void): void {
     this.wakuInstance.relay.addObserver(
-      cb,
+      handler,
       [contentTopic],
     );
   }
