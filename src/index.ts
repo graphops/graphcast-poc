@@ -1,23 +1,21 @@
-import { observer } from "./observer";
-import { messenger } from "./messenger";
-import { Waku } from "js-waku";
+import { Observer } from "./observer";
+import { Messenger } from "./messenger";
 
 const run = async () => {
-  const waku = await Waku.create({
-    bootstrap: {
-      default: true,
-    }
+  const observer = new Observer();
+  const messenger = new Messenger();
+
+  await observer.init();
+  await messenger.init();
+
+  const topic = "/my-cool-app/123/my-use-case/proto";
+
+  // TODO: Add wrapper to abstract around WakuMessage in callback
+  observer.observe("/my-cool-app/123/my-use-case/proto", () => {
+    console.log(`Messege received for topic ${topic}`);
   });
-  
-  await waku.waitForRemotePeer();
 
-  await observer(waku);
-  await messenger("Custom message");
-}
+  await messenger.sendMessage("hello", topic);
+};
 
-run().then(() => {
-  console.log("Running gossip client...");
-}, err => {
-  console.log(`Oh no! Something went wrong: ${err.message}`);
-  process.exit(1);
-});
+run().then();

@@ -1,17 +1,24 @@
 import { Waku, WakuMessage } from "js-waku";
 
-export const messenger = async (message: string) => {
-  const waku = await Waku.create({
-    bootstrap: {
-      default: true,
-    }
-  });
-  await waku.waitForRemotePeer();
+export class Messenger {
+  wakuInstance: Waku;
 
-  const msg = await WakuMessage.fromUtf8String(
-    message,
-    "/my-cool-app/123/my-use-case/proto",
-  );
+  async init() {
+    const waku = await Waku.create({
+      bootstrap: {
+        default: true,
+      },
+    });
+    await waku.waitForRemotePeer();
+    this.wakuInstance = waku;
+  }
 
-  await waku.relay.send(msg);
-};
+  async sendMessage(payload: string, contentTopic: string) {
+    const msg = await WakuMessage.fromUtf8String(
+      payload,
+      contentTopic,
+    );
+
+    await this.wakuInstance.relay.send(msg);
+  }
+}

@@ -1,10 +1,27 @@
-import { Waku } from "js-waku";
+import { Waku, WakuMessage } from "js-waku";
 
-export const observer = async (waku: Waku) => {
-  waku.relay.addObserver(
-    (msg) => {
-      console.log("Message received:", msg.payloadAsUtf8);
-    },
-    ["/my-cool-app/123/my-use-case/proto"],
-  );
-};
+// type GossipMessage = {
+//   payload: string,
+// };
+
+export class Observer {
+  wakuInstance: Waku;
+
+  async init() {
+    const waku = await Waku.create({
+      bootstrap: {
+        default: true,
+      }
+    });
+  
+    await waku.waitForRemotePeer();
+    this.wakuInstance = waku;
+  }
+
+  observe(contentTopic: string, cb: (message: WakuMessage) => void): void {
+    this.wakuInstance.relay.addObserver(
+      cb,
+      [contentTopic],
+    );
+  }
+}
