@@ -34,7 +34,6 @@ const run = async () => {
       const { timestamp, blockNumber, text } = message;
       console.info(`A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nText: '${text}'\n`);
     });
-
   };
 
   observer.observe("/my-cool-app/123/my-use-case/proto", handler);
@@ -59,4 +58,7 @@ const run = async () => {
   });
 };
 
-run().then();
+run().then().catch(err => {
+  console.error(`Oh no! An error occurred: ${err.message}`);
+  process.exit(1);
+});
