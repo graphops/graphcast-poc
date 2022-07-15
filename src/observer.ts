@@ -1,4 +1,5 @@
 import { Waku } from "js-waku";
+import { WakuMessage } from "js-waku/build/main/proto/waku/v2/message";
 
 export class Observer {
   wakuInstance: Waku;
@@ -14,9 +15,11 @@ export class Observer {
     this.wakuInstance = waku;
   }
 
-  observe(contentTopic: string, handler: () => void): void {
+  observe(contentTopic: string, handler: (msg: Uint8Array) => void): void {
     this.wakuInstance.relay.addObserver(
-      handler,
+      (msg: WakuMessage) => {
+        handler(msg.payload);
+      },
       [contentTopic],
     );
   }

@@ -9,14 +9,14 @@ export class Messenger {
         default: true,
       },
     });
-    
+
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
   }
 
-  async sendMessage(payload: string, contentTopic: string) {
-    const msg = await WakuMessage.fromUtf8String(
-      payload,
+  async sendMessage(encodedMessage: Uint8Array, contentTopic: string) {
+    const msg = await WakuMessage.fromBytes(
+      encodedMessage,
       contentTopic,
     );
 

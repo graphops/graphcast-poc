@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint '*/**/*.ts'",
     "watch": "tsc-watch --onSuccess \"npm start\"",
-    "start": "node ./dist/examples/gossip-module.js"
+    "start": "node ./dist/examples/poi-crosschecker/poi-crosschecker.js"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "ethers": "^5.6.9",
-    "js-waku": "^0.24.0"
+    "js-waku": "^0.24.0",
+    "protobufjs": "^7.0.0"
   }
 }
