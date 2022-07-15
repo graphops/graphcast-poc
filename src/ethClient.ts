@@ -9,10 +9,14 @@ export class EthClient {
     this.provider = provider;
   }
 
-  listen() {
-    this.provider.on("block", async () => {
-      const blockNumber = await this.provider.getBlockNumber()
-      console.log(`New block! ${blockNumber}`);
-    });
+  // The bit that interacts with the module
+  // listen() {
+  //   this.provider.on("block", async () => {
+  //     const blockNumber = await this.provider.getBlockNumber();
+  //   });
+  // }
+
+  async getBlockNumber(): Promise<number> {
+    return await this.provider.getBlockNumber();
   }
 }
