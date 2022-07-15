@@ -1,7 +1,8 @@
 syntax = "proto3";
-package message;
+package gossip;
 
 message Message {
-    uint64 timestamp = 1;
+    // TODO: This probably should not be a string, but parsing to BigInt was causing problems so leaving it like this for now
+    string timestamp = 1;
     string text = 2;
 }

@@ -16,35 +16,34 @@ const run = async () => {
 
   const topic = "/my-cool-app/123/my-use-case/proto";
 
-
   const handler = (msg: Uint8Array) => {
     protobuf.load("src/examples/poi-crosschecker/proto/message.proto", async (err, root)=> {
       if(err) {
         throw err;
       }
   
-      const Message = root.lookupType("message.Message");
+      const Message = root.lookupType("gossip.Message");
       const decodedMessage = Message.decode(msg);
-      const payload = decodedMessage.text;
-      console.log(`Hello from custom callback from module. I received this payload: ${payload}`);
+      const { text, timestamp } = decodedMessage;
+      console.log(`${timestamp} I received the following message: '${text}'`);
     });
 
   };
 
   observer.observe("/my-cool-app/123/my-use-case/proto", handler);
-
+  
   const message = {
-    timestamp: BigInt(new Date().getTime()),
+    timestamp: new Date().getTime().toString(),
     text: "Hello, this is the message text!",
   }
 
-  // Probably would be good to take out the protobuf stuff in a seperate file
+  // TODO: Probably would be good to take out the protobuf stuff in a seperate utils file
   protobuf.load("src/examples/poi-crosschecker/proto/message.proto", async (err, root)=> {
     if(err) {
       throw err;
     }
 
-    const Message = root.lookupType("message.Message");
+    const Message = root.lookupType("gossip.Message");
     const encodedMessage = Message.encode(message).finish();
     await messenger.sendMessage(encodedMessage, topic);
   });
