@@ -1,8 +1,9 @@
 syntax = "proto3";
 package gossip;
 
-message Message {
+message NPOIMessage {
     int64 timestamp = 1;
     int64 blockNumber = 2;
-    string text = 3;
+    string subgraph = 3;
+    string nPOI = 4;
 }
