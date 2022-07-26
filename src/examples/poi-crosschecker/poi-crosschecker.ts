@@ -89,7 +89,7 @@ const run = async () => {
           blockNumber: block - 5,
           subgraph: process.env.TEST_SUBGRAPH,
           nPOI: poiResponse.proofOfIndexing,
-          // TODO: Randomize this indexer address for testing with a few instances of graph-node ? Or hardcode a different one every time
+          // We should randomize this indexer address for testing with a few instances of graph-node, or just hardcode a different one every time
           sender: "0x0000000000000000000000000000000000000000"
         }
 
