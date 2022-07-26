@@ -6,4 +6,5 @@ message NPOIMessage {
     int64 blockNumber = 2;
     string subgraph = 3;
     string nPOI = 4;
+    string sender = 5; 
 }

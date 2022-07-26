@@ -20,7 +20,7 @@ export class Observer {
       (msg: WakuMessage) => {
         handler(msg.payload);
       },
-      [contentTopic],
+      [`/graph-gossip/0/${contentTopic}/proto`],
     );
   }
 }
