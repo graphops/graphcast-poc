@@ -53,7 +53,7 @@ const run = async () => {
           const attestation: Attestation = {
             nPOI,
             indexerAddress: sender,
-            stake: indexerStakeResponse.indexer.stakedTokens,
+            stake: process.env.TEST_RUN ? BigInt(222) : indexerStakeResponse.indexer.stakedTokens,
           }
 
           const attestations = nPOIs.get(subgraph);
@@ -73,7 +73,7 @@ const run = async () => {
     });
   };
 
-  observer.observe("/my-cool-app/123/my-use-case/proto", handler);
+  observer.observe("poi-crosschecker", handler);
 
   const { provider } = ethClient;
 
