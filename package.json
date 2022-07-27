@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint '*/**/*.ts'",
+    "build": "tsc -b",
     "watch": "tsc-watch --onSuccess \"npm start\"",
-    "start": "node ./dist/examples/poi-crosschecker/poi-crosschecker.js"
+    "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",

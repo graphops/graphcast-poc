@@ -4,6 +4,7 @@
     "module": "commonjs",
     "skipLibCheck": true,
     "outDir": "./dist",
+    "rootDir": "."
   },
   "include": ["src/**/*", "tests"],
 }

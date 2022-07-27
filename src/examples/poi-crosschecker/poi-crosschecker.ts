@@ -25,7 +25,7 @@ const run = async () => {
   const handler = (msg: Uint8Array) => {
     console.log(nPOIs);
 
-    protobuf.load("src/examples/poi-crosschecker/proto/NPOIMessage.proto", async (err, root) => {
+    protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
       if (err) {
         throw err;
       }
@@ -78,11 +78,13 @@ const run = async () => {
   const { provider } = ethClient;
 
   provider.on("block", async block => {
+    console.log(block);
+
     if (block % 2 === 0) {
       const blockObject = await provider.getBlock(block - 5);
 
       if (process.env.TEST_RUN) {
-        const poiResponse = await request('http://localhost:8030/graphql', poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash));
+        const poiResponse = await request(`http://${process.env.GRAPH_NODE_URL}:8030/graphql`, poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash));
 
         const message = {
           timestamp: new Date().getTime(),
@@ -93,7 +95,7 @@ const run = async () => {
           sender: "0x0000000000000000000000000000000000000000"
         }
 
-        protobuf.load("src/examples/poi-crosschecker/proto/NPOIMessage.proto", async (err, root) => {
+        protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
           if (err) {
             throw err;
           }
@@ -107,7 +109,7 @@ const run = async () => {
         const allocations = indexerResponse.indexer.allocations;
 
         for (let i = 0; i < allocations.length; i++) {
-          const poiResponse = await request('http://localhost:8030/graphql', poiQuery(allocations[i].subgraphDeployment.ipfsHash, block - 5, blockObject.hash));
+          const poiResponse = await request(`http://${process.env.GRAPH_NODE_URL}:8030/graphql`, poiQuery(allocations[i].subgraphDeployment.ipfsHash, block - 5, blockObject.hash));
 
           const message = {
             timestamp: new Date().getTime(),
@@ -117,7 +119,7 @@ const run = async () => {
             sender: process.env.INDEXER_ADDRESS,
           }
 
-          protobuf.load("src/examples/poi-crosschecker/proto/NPOIMessage.proto", async (err, root) => {
+          protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
             if (err) {
               throw err;
             }
