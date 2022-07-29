@@ -77,10 +77,11 @@ const run = async () => {
 
   const { provider } = ethClient;
 
+  // TODO: Extract the two cases in this handler into separate functions
   provider.on("block", async block => {
     console.log(block);
 
-    if (block % 2 === 0) {
+    if (block % 5 === 0) {
       const blockObject = await provider.getBlock(block - 5);
 
       if (process.env.TEST_RUN) {
@@ -95,15 +96,19 @@ const run = async () => {
           sender: "0x0000000000000000000000000000000000000000"
         }
 
-        protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-          if (err) {
-            throw err;
-          }
+        if (poiResponse.proofOfIndexing == undefined || poiResponse.proofOfIndexing == null) {
+          console.log(`Could not get nPOI for subgraph ${process.env.TEST_SUBGRAPH} and block ${block - 5}. Please check if your node has fully synced the subgraph.`);
+        } else {
+          protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+            if (err) {
+              throw err;
+            }
 
-          const Message = root.lookupType("gossip.NPOIMessage");
-          const encodedMessage = Message.encode(message).finish();
-          await messenger.sendMessage(encodedMessage, topic);
-        });
+            const Message = root.lookupType("gossip.NPOIMessage");
+            const encodedMessage = Message.encode(message).finish();
+            await messenger.sendMessage(encodedMessage, topic);
+          });
+        }
       } else {
         const indexerResponse: IndexerResponse = await request('https://gateway.thegraph.com/network', indexerAllocationsQuery);
         const allocations = indexerResponse.indexer.allocations;
@@ -119,19 +124,26 @@ const run = async () => {
             sender: process.env.INDEXER_ADDRESS,
           }
 
-          protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-            if (err) {
-              throw err;
-            }
+          if (poiResponse.proofOfIndexing == undefined || poiResponse.proofOfIndexing == null) {
+            console.log(`Could not get nPOI for subgraph ${allocations[i].subgraphDeployment.ipfsHash} and block ${block - 5}. Please check if your node has fully synced the subgraph.`);
+          } else {
+            protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+              if (err) {
+                throw err;
+              }
 
-            const Message = root.lookupType("gossip.NPOIMessage");
-            const encodedMessage = Message.encode(message).finish();
-            await messenger.sendMessage(encodedMessage, topic);
-          });
+              const Message = root.lookupType("gossip.NPOIMessage");
+              const encodedMessage = Message.encode(message).finish();
+              await messenger.sendMessage(encodedMessage, topic);
+            });
+          }
         }
       }
+    } else if (block % 10) {
+      // TODO: Compare our nPOI with the one with the most attestations
+      // TODO: Clear our local store
     }
-  })
+  });
 };
 
 run().then().catch(err => {
