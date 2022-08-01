@@ -3,8 +3,11 @@ import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
 import { request } from "graphql-request";
 import { Attestation, IndexerResponse, IndexerStakeResponse } from "./types";
-import { indexerStakeQuery, indexerAllocationsQuery, poiQuery } from "./queries";
-import { attestationExists } from "./utils";
+import {
+  indexerStakeQuery,
+  indexerAllocationsQuery,
+  poiQuery,
+} from "./queries";
 import "dotenv/config";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -20,7 +23,7 @@ const run = async () => {
 
   const topic = "poi-crosschecker";
 
-  const nPOIs: Map<string, Attestation[]> = new Map();
+  const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
 
   const handler = (msg: Uint8Array) => {
     console.log(nPOIs);
@@ -42,33 +45,45 @@ const run = async () => {
       });
 
       const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
-      console.info(`A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`);
+      console.info(
+        `A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
+      );
 
-      const indexerStakeResponse: IndexerStakeResponse = await request('https://gateway.thegraph.com/network', indexerStakeQuery);
+      const indexerStakeResponse: IndexerStakeResponse = await request(
+        "https://gateway.thegraph.com/network",
+        indexerStakeQuery
+      );
 
       if (nPOIs.has(subgraph)) {
-        if (attestationExists(nPOIs.get(subgraph), sender, nPOI)) {
-          console.log(`Attestation with sender address: ${sender} and nPOI: ${nPOI} already exists in the store.`);
-        } else {
-          const attestation: Attestation = {
-            nPOI,
-            indexerAddress: sender,
-            stake: process.env.TEST_RUN ? BigInt(222) : indexerStakeResponse.indexer.stakedTokens,
-          }
+        const attestation: Attestation = {
+          nPOI,
+          indexerAddress: sender,
+          stake: process.env.TEST_RUN
+            ? BigInt(222)
+            : indexerStakeResponse.indexer.stakedTokens,
+        };
 
-          const attestations = nPOIs.get(subgraph);
+        const blocks = nPOIs.get(subgraph);
+
+        if (blocks.has(blockNumber.toString())) {
+          const attestations = [...blocks.get(blockNumber.toString())];
           attestations.push(attestation);
-
-          nPOIs.set(subgraph, attestations);
+          blocks.set(blockNumber.toString(), attestations);
+        } else {
+          blocks.set(blockNumber.toString(), [attestation]);
         }
       } else {
         const attestation: Attestation = {
           nPOI,
           indexerAddress: sender,
-          stake: process.env.TEST_RUN ? BigInt(111) : indexerStakeResponse.indexer.stakedTokens,
+          stake: process.env.TEST_RUN
+            ? BigInt(111)
+            : indexerStakeResponse.indexer.stakedTokens,
         };
 
-        nPOIs.set(subgraph, [attestation]);
+        const blocks = new Map();
+        blocks.set(blockNumber.toString(), [attestation]);
+        nPOIs.set(subgraph, blocks);
       }
     });
   };
@@ -78,14 +93,20 @@ const run = async () => {
   const { provider } = ethClient;
 
   // TODO: Extract the two cases in this handler into separate functions
-  provider.on("block", async block => {
+  provider.on("block", async (block) => {
     console.log(block);
 
-    if (block % 5 === 0) {
+    if (block % 10 === 0) {
+      console.log("Checking store...");
+      console.log(nPOIs);
+    } else if (block % 5 === 0) {
       const blockObject = await provider.getBlock(block - 5);
 
       if (process.env.TEST_RUN) {
-        const poiResponse = await request(`http://${process.env.LOCALHOST}:8030/graphql`, poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash));
+        const poiResponse = await request(
+          `http://${process.env.LOCALHOST}:8030/graphql`,
+          poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash)
+        );
 
         const message = {
           timestamp: new Date().getTime(),
@@ -93,11 +114,20 @@ const run = async () => {
           subgraph: process.env.TEST_SUBGRAPH,
           nPOI: poiResponse.proofOfIndexing,
           // We should randomize this indexer address for testing with a few instances of graph-node, or just hardcode a different one every time
-          sender: "0x0000000000000000000000000000000000000000"
-        }
+          sender: "0x0000000000000000000000000000000000000000",
+        };
 
-        if (poiResponse.proofOfIndexing == undefined || poiResponse.proofOfIndexing == null) {
-          console.log(`Could not get nPOI for subgraph ${process.env.TEST_SUBGRAPH} and block ${block - 5}. Please check if your node has fully synced the subgraph.`);
+        if (
+          poiResponse.proofOfIndexing == undefined ||
+          poiResponse.proofOfIndexing == null
+        ) {
+          console.log(
+            `Could not get nPOI for subgraph ${
+              process.env.TEST_SUBGRAPH
+            } and block ${
+              block - 5
+            }. Please check if your node has fully synced the subgraph.`
+          );
         } else {
           protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
             if (err) {
@@ -110,11 +140,21 @@ const run = async () => {
           });
         }
       } else {
-        const indexerResponse: IndexerResponse = await request('https://gateway.thegraph.com/network', indexerAllocationsQuery);
+        const indexerResponse: IndexerResponse = await request(
+          "https://gateway.thegraph.com/network",
+          indexerAllocationsQuery
+        );
         const allocations = indexerResponse.indexer.allocations;
 
         for (let i = 0; i < allocations.length; i++) {
-          const poiResponse = await request(`http://${process.env.LOCALHOST}:8030/graphql`, poiQuery(allocations[i].subgraphDeployment.ipfsHash, block - 5, blockObject.hash));
+          const poiResponse = await request(
+            `http://${process.env.LOCALHOST}:8030/graphql`,
+            poiQuery(
+              allocations[i].subgraphDeployment.ipfsHash,
+              block - 5,
+              blockObject.hash
+            )
+          );
 
           const message = {
             timestamp: new Date().getTime(),
@@ -122,10 +162,19 @@ const run = async () => {
             subgraph: allocations[i].subgraphDeployment.ipfsHash,
             nPOI: poiResponse.proofOfIndexing,
             sender: process.env.INDEXER_ADDRESS,
-          }
+          };
 
-          if (poiResponse.proofOfIndexing == undefined || poiResponse.proofOfIndexing == null) {
-            console.log(`Could not get nPOI for subgraph ${allocations[i].subgraphDeployment.ipfsHash} and block ${block - 5}. Please check if your node has fully synced the subgraph.`);
+          if (
+            poiResponse.proofOfIndexing == undefined ||
+            poiResponse.proofOfIndexing == null
+          ) {
+            console.log(
+              `Could not get nPOI for subgraph ${
+                allocations[i].subgraphDeployment.ipfsHash
+              } and block ${
+                block - 5
+              }. Please check if your node has fully synced the subgraph.`
+            );
           } else {
             protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
               if (err) {
@@ -139,14 +188,13 @@ const run = async () => {
           }
         }
       }
-    } else if (block % 10) {
-      // TODO: Compare our nPOI with the one with the most attestations
-      // TODO: Clear our local store
     }
   });
 };
 
-run().then().catch(err => {
-  console.error(`Oh no! An error occurred: ${err.message}`);
-  process.exit(1);
-});
+run()
+  .then()
+  .catch((err) => {
+    console.error(`Oh no! An error occurred: ${err.message}`);
+    process.exit(1);
+  });
