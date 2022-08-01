@@ -85,7 +85,7 @@ const run = async () => {
       const blockObject = await provider.getBlock(block - 5);
 
       if (process.env.TEST_RUN) {
-        const poiResponse = await request(`http://${process.env.GRAPH_NODE_URL}:8030/graphql`, poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash));
+        const poiResponse = await request(`http://${process.env.LOCALHOST}:8030/graphql`, poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash));
 
         const message = {
           timestamp: new Date().getTime(),
@@ -114,7 +114,7 @@ const run = async () => {
         const allocations = indexerResponse.indexer.allocations;
 
         for (let i = 0; i < allocations.length; i++) {
-          const poiResponse = await request(`http://${process.env.GRAPH_NODE_URL}:8030/graphql`, poiQuery(allocations[i].subgraphDeployment.ipfsHash, block - 5, blockObject.hash));
+          const poiResponse = await request(`http://${process.env.LOCALHOST}:8030/graphql`, poiQuery(allocations[i].subgraphDeployment.ipfsHash, block - 5, blockObject.hash));
 
           const message = {
             timestamp: new Date().getTime(),

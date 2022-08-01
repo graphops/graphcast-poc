@@ -5,7 +5,7 @@ export class EthClient {
   provider: JsonRpcProvider;
 
   constructor() {
-    const provider = new ethers.providers.JsonRpcProvider("https://mainnet.infura.io/v3/b0ee91cba1d44f6b83b3017b11f69ff3");
+    const provider = new ethers.providers.JsonRpcProvider(`http://${process.env.LOCALHOST}:8545`);
     this.provider = provider;
   }
 
