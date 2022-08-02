@@ -217,12 +217,12 @@ const run = async () => {
         const remoteBlocks = nPOIs.get(subgraph);
 
         if (
-          remoteBlocks == null &&
-          remoteBlocks == undefined &&
+          remoteBlocks == null ||
+          remoteBlocks == undefined ||
           remoteBlocks.size === 0
         ) {
           console.log(
-            `Could not find entries for subgraph ${subgraph} in remote nPOIs.`
+            `Could not find entries for subgraph ${subgraph} in remote nPOIs. Continuing...`
               .red
           );
         } else {
