@@ -103,7 +103,7 @@ const run = async () => {
 
     if (process.env.TEST_RUN) {
       const poiResponse = await request(
-        `http://${process.env.LOCALHOST}:8030/graphql`,
+        `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
         poiQuery(process.env.TEST_SUBGRAPH, block, blockObject.hash)
       );
 
@@ -155,7 +155,7 @@ const run = async () => {
         const subgraph = allocations[i].subgraphDeployment.ipfsHash;
 
         const poiResponse = await request(
-          `http://${process.env.LOCALHOST}:8030/graphql`,
+          `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
           poiQuery(subgraph, block, blockObject.hash)
         );
 
@@ -217,8 +217,8 @@ const run = async () => {
         const remoteBlocks = nPOIs.get(subgraph);
 
         if (
-          remoteBlocks === null &&
-          remoteBlocks === undefined &&
+          remoteBlocks == null &&
+          remoteBlocks == undefined &&
           remoteBlocks.size === 0
         ) {
           console.log(
