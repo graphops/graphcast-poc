@@ -120,7 +120,7 @@ const run = async () => {
         poiResponse.proofOfIndexing == null
       ) {
         console.log(
-          `😔 Could not get nPOI for subgraph ${process.env.TEST_SUBGRAPH} and block ${block}. Please check if your node has fully synced the subgraph.`
+          `😔 Could not get nPOI for subgraph ${process.env.TEST_SUBGRAPH} and block ${block}. Please check if your node has fully synced the subgraph. Continuing...`
             .red
         );
       } else {
@@ -211,7 +211,9 @@ const run = async () => {
     }
 
     if (block == compareBlock) {
-      console.log("🔬 Comparing nPOIs...".blue);
+      if (myNPOIs.size > 0) {
+        console.log("🔬 Comparing nPOIs...".blue);
+      }
 
       myNPOIs.forEach((blocks, subgraph) => {
         const remoteBlocks = nPOIs.get(subgraph);
