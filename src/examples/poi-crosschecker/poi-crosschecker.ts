@@ -30,6 +30,8 @@ const run = async () => {
 
   const handler = (msg: Uint8Array) => {
     printNPOIs(nPOIs);
+    console.log("👀 My nPOIs:".blue);
+    console.log(myNPOIs);
 
     protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
       if (err) {
@@ -63,7 +65,7 @@ const run = async () => {
           nPOI,
           indexerAddress: sender,
           stake: process.env.TEST_RUN
-            ? BigInt(222)
+            ? BigInt(Math.round(Math.random() * 1000))
             : indexerStakeResponse.indexer.stakedTokens,
         };
 
@@ -81,7 +83,7 @@ const run = async () => {
           nPOI,
           indexerAddress: sender,
           stake: process.env.TEST_RUN
-            ? BigInt(111)
+            ? BigInt(Math.round(Math.random() * 1000))
             : indexerStakeResponse.indexer.stakedTokens,
         };
 
@@ -97,17 +99,17 @@ const run = async () => {
   const { provider } = ethClient;
 
   const getNPOIs = async (block: number) => {
-    const blockObject = await provider.getBlock(block - 5);
+    const blockObject = await provider.getBlock(block);
 
     if (process.env.TEST_RUN) {
       const poiResponse = await request(
         `http://${process.env.LOCALHOST}:8030/graphql`,
-        poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash)
+        poiQuery(process.env.TEST_SUBGRAPH, block, blockObject.hash)
       );
 
       const message = {
         timestamp: new Date().getTime(),
-        blockNumber: block - 5,
+        blockNumber: block,
         subgraph: process.env.TEST_SUBGRAPH,
         nPOI: poiResponse.proofOfIndexing,
         sender: "0x0000000000000000000000000000000000000000",
@@ -118,16 +120,23 @@ const run = async () => {
         poiResponse.proofOfIndexing == null
       ) {
         console.log(
-          `😔 Could not get nPOI for subgraph ${
-            process.env.TEST_SUBGRAPH
-          } and block ${
-            block - 5
-          }. Please check if your node has fully synced the subgraph.`.red
+          `😔 Could not get nPOI for subgraph ${process.env.TEST_SUBGRAPH} and block ${block}. Please check if your node has fully synced the subgraph.`
+            .red
         );
       } else {
         protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
           if (err) {
             throw err;
+          }
+
+          if (!myNPOIs.has(process.env.TEST_SUBGRAPH)) {
+            const blocks = new Map();
+            blocks.set(block.toString(), poiResponse.proofOfIndexing);
+            myNPOIs.set(process.env.TEST_SUBGRAPH, blocks);
+          } else {
+            const blocks = myNPOIs.get(process.env.TEST_SUBGRAPH);
+            blocks.set(block.toString(), poiResponse.proofOfIndexing);
+            myNPOIs.set(process.env.TEST_SUBGRAPH, blocks);
           }
 
           const Message = root.lookupType("gossip.NPOIMessage");
@@ -143,19 +152,17 @@ const run = async () => {
       const allocations = indexerResponse.indexer.allocations;
 
       for (let i = 0; i < allocations.length; i++) {
+        const subgraph = allocations[i].subgraphDeployment.ipfsHash;
+
         const poiResponse = await request(
           `http://${process.env.LOCALHOST}:8030/graphql`,
-          poiQuery(
-            allocations[i].subgraphDeployment.ipfsHash,
-            block - 5,
-            blockObject.hash
-          )
+          poiQuery(subgraph, block, blockObject.hash)
         );
 
         const message = {
           timestamp: new Date().getTime(),
-          blockNumber: block - 5,
-          subgraph: allocations[i].subgraphDeployment.ipfsHash,
+          blockNumber: block,
+          subgraph,
           nPOI: poiResponse.proofOfIndexing,
           sender: process.env.INDEXER_ADDRESS,
         };
@@ -165,11 +172,8 @@ const run = async () => {
           poiResponse.proofOfIndexing == null
         ) {
           console.log(
-            `😔 Could not get nPOI for subgraph ${
-              allocations[i].subgraphDeployment.ipfsHash
-            } and block ${
-              block - 5
-            }. Please check if your node has fully synced the subgraph.`.red
+            `😔 Could not get nPOI for subgraph ${subgraph} and block ${block}. Please check if your node has fully synced the subgraph.`
+              .red
           );
         } else {
           protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
@@ -177,7 +181,15 @@ const run = async () => {
               throw err;
             }
 
-            //TODO: Save to myNPOIs
+            if (!myNPOIs.has(subgraph)) {
+              const blocks = new Map();
+              blocks.set(block.toString(), poiResponse.proofOfIndexing);
+              myNPOIs.set(subgraph, blocks);
+            } else {
+              const blocks = myNPOIs.get(subgraph);
+              blocks.set(block.toString(), poiResponse.proofOfIndexing);
+              myNPOIs.set(subgraph, blocks);
+            }
 
             const Message = root.lookupType("gossip.NPOIMessage");
             const encodedMessage = Message.encode(message).finish();
@@ -195,11 +207,65 @@ const run = async () => {
     if (block % 5 === 0) {
       // Going 5 blocks back as a buffer to make sure the node is fully synced
       getNPOIs(block - 5);
-      compareBlock = block + 2;
+      compareBlock = block + 3;
     }
 
     if (block == compareBlock) {
       console.log("🔬 Comparing nPOIs...".blue);
+
+      myNPOIs.forEach((blocks, subgraph) => {
+        const remoteBlocks = nPOIs.get(subgraph);
+
+        if (
+          remoteBlocks === null &&
+          remoteBlocks === undefined &&
+          remoteBlocks.size === 0
+        ) {
+          console.log(
+            `Could not find entries for subgraph ${subgraph} in remote nPOIs.`
+              .red
+          );
+        } else {
+          const attestations = remoteBlocks.get((block - 8).toString());
+
+          console.log(
+            `📒 Attestations for subgraph ${subgraph} on block ${block - 8}:`
+              .blue
+          );
+          console.log(attestations);
+
+          const sorted = attestations.sort((a, b) => {
+            if (a.stake > b.stake) {
+              return 1;
+            } else if (a.stake < b.stake) {
+              return -1;
+            } else {
+              return 0;
+            }
+          });
+
+          const topAttestation = sorted[0];
+          const myNPOI = blocks.get((block - 8).toString());
+
+          if (topAttestation.nPOI === myNPOI) {
+            console.log(
+              `✅ POIs match for subgraph ${subgraph} on block ${block - 8}.`
+                .green
+            );
+          } else {
+            console.log(
+              `❌ POIS do not match for subgraph ${subgraph} on block ${
+                block - 8
+              }. Local POI is ${myNPOI} and remote POI tied to the most stake is ${
+                topAttestation.nPOI
+              }.`
+            );
+          }
+        }
+      });
+
+      nPOIs.clear();
+      myNPOIs.clear();
     }
   });
 };
