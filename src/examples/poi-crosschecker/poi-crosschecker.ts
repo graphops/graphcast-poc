@@ -8,6 +8,8 @@ import {
   indexerAllocationsQuery,
   poiQuery,
 } from "./queries";
+import { printNPOIs } from "../../utils";
+import "colors";
 import "dotenv/config";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -24,9 +26,10 @@ const run = async () => {
   const topic = "poi-crosschecker";
 
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
+  const myNPOIs: Map<string, Map<string, string>> = new Map();
 
   const handler = (msg: Uint8Array) => {
-    console.log(nPOIs);
+    printNPOIs(nPOIs);
 
     protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
       if (err) {
@@ -46,7 +49,8 @@ const run = async () => {
 
       const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
       console.info(
-        `A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
+        `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
+          .green
       );
 
       const indexerStakeResponse: IndexerStakeResponse = await request(
@@ -92,29 +96,68 @@ const run = async () => {
 
   const { provider } = ethClient;
 
-  // TODO: Extract the two cases in this handler into separate functions
-  provider.on("block", async (block) => {
-    console.log(block);
+  const getNPOIs = async (block: number) => {
+    const blockObject = await provider.getBlock(block - 5);
 
-    if (block % 10 === 0) {
-      console.log("Checking store...");
-      console.log(nPOIs);
-    } else if (block % 5 === 0) {
-      const blockObject = await provider.getBlock(block - 5);
+    if (process.env.TEST_RUN) {
+      const poiResponse = await request(
+        `http://${process.env.LOCALHOST}:8030/graphql`,
+        poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash)
+      );
 
-      if (process.env.TEST_RUN) {
+      const message = {
+        timestamp: new Date().getTime(),
+        blockNumber: block - 5,
+        subgraph: process.env.TEST_SUBGRAPH,
+        nPOI: poiResponse.proofOfIndexing,
+        sender: "0x0000000000000000000000000000000000000000",
+      };
+
+      if (
+        poiResponse.proofOfIndexing == undefined ||
+        poiResponse.proofOfIndexing == null
+      ) {
+        console.log(
+          `😔 Could not get nPOI for subgraph ${
+            process.env.TEST_SUBGRAPH
+          } and block ${
+            block - 5
+          }. Please check if your node has fully synced the subgraph.`.red
+        );
+      } else {
+        protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+          if (err) {
+            throw err;
+          }
+
+          const Message = root.lookupType("gossip.NPOIMessage");
+          const encodedMessage = Message.encode(message).finish();
+          await messenger.sendMessage(encodedMessage, topic);
+        });
+      }
+    } else {
+      const indexerResponse: IndexerResponse = await request(
+        "https://gateway.thegraph.com/network",
+        indexerAllocationsQuery
+      );
+      const allocations = indexerResponse.indexer.allocations;
+
+      for (let i = 0; i < allocations.length; i++) {
         const poiResponse = await request(
           `http://${process.env.LOCALHOST}:8030/graphql`,
-          poiQuery(process.env.TEST_SUBGRAPH, block - 5, blockObject.hash)
+          poiQuery(
+            allocations[i].subgraphDeployment.ipfsHash,
+            block - 5,
+            blockObject.hash
+          )
         );
 
         const message = {
           timestamp: new Date().getTime(),
           blockNumber: block - 5,
-          subgraph: process.env.TEST_SUBGRAPH,
+          subgraph: allocations[i].subgraphDeployment.ipfsHash,
           nPOI: poiResponse.proofOfIndexing,
-          // We should randomize this indexer address for testing with a few instances of graph-node, or just hardcode a different one every time
-          sender: "0x0000000000000000000000000000000000000000",
+          sender: process.env.INDEXER_ADDRESS,
         };
 
         if (
@@ -122,11 +165,11 @@ const run = async () => {
           poiResponse.proofOfIndexing == null
         ) {
           console.log(
-            `Could not get nPOI for subgraph ${
-              process.env.TEST_SUBGRAPH
+            `😔 Could not get nPOI for subgraph ${
+              allocations[i].subgraphDeployment.ipfsHash
             } and block ${
               block - 5
-            }. Please check if your node has fully synced the subgraph.`
+            }. Please check if your node has fully synced the subgraph.`.red
           );
         } else {
           protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
@@ -134,60 +177,29 @@ const run = async () => {
               throw err;
             }
 
+            //TODO: Save to myNPOIs
+
             const Message = root.lookupType("gossip.NPOIMessage");
             const encodedMessage = Message.encode(message).finish();
             await messenger.sendMessage(encodedMessage, topic);
           });
         }
-      } else {
-        const indexerResponse: IndexerResponse = await request(
-          "https://gateway.thegraph.com/network",
-          indexerAllocationsQuery
-        );
-        const allocations = indexerResponse.indexer.allocations;
-
-        for (let i = 0; i < allocations.length; i++) {
-          const poiResponse = await request(
-            `http://${process.env.LOCALHOST}:8030/graphql`,
-            poiQuery(
-              allocations[i].subgraphDeployment.ipfsHash,
-              block - 5,
-              blockObject.hash
-            )
-          );
-
-          const message = {
-            timestamp: new Date().getTime(),
-            blockNumber: block - 5,
-            subgraph: allocations[i].subgraphDeployment.ipfsHash,
-            nPOI: poiResponse.proofOfIndexing,
-            sender: process.env.INDEXER_ADDRESS,
-          };
-
-          if (
-            poiResponse.proofOfIndexing == undefined ||
-            poiResponse.proofOfIndexing == null
-          ) {
-            console.log(
-              `Could not get nPOI for subgraph ${
-                allocations[i].subgraphDeployment.ipfsHash
-              } and block ${
-                block - 5
-              }. Please check if your node has fully synced the subgraph.`
-            );
-          } else {
-            protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-              if (err) {
-                throw err;
-              }
-
-              const Message = root.lookupType("gossip.NPOIMessage");
-              const encodedMessage = Message.encode(message).finish();
-              await messenger.sendMessage(encodedMessage, topic);
-            });
-          }
-        }
       }
+    }
+  };
+
+  let compareBlock = 0;
+  provider.on("block", async (block) => {
+    console.log(`🔗 ${block}`);
+
+    if (block % 5 === 0) {
+      // Going 5 blocks back as a buffer to make sure the node is fully synced
+      getNPOIs(block - 5);
+      compareBlock = block + 2;
+    }
+
+    if (block == compareBlock) {
+      console.log("🔬 Comparing nPOIs...".blue);
     }
   });
 };
@@ -195,6 +207,6 @@ const run = async () => {
 run()
   .then()
   .catch((err) => {
-    console.error(`Oh no! An error occurred: ${err.message}`);
+    console.error(`❌ Oh no! An error occurred: ${err.message}`.red);
     process.exit(1);
   });

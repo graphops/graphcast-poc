@@ -8,7 +8,7 @@ export class Observer {
     const waku = await Waku.create({
       bootstrap: {
         default: true,
-      }
+      },
     });
 
     await waku.waitForRemotePeer();
@@ -20,7 +20,7 @@ export class Observer {
       (msg: WakuMessage) => {
         handler(msg.payload);
       },
-      [`/graph-gossip/0/${contentTopic}/proto`],
+      [`/graph-gossip/0/${contentTopic}/proto`]
     );
   }
 }
