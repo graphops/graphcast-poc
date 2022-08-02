@@ -112,7 +112,7 @@ const run = async () => {
         blockNumber: block,
         subgraph: process.env.TEST_SUBGRAPH,
         nPOI: poiResponse.proofOfIndexing,
-        sender: "0x0000000000000000000000000000000000000000",
+        sender: process.env.INDEXER_ADDRESS,
       };
 
       if (
