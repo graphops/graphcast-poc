@@ -84,7 +84,7 @@ const run = async () => {
           indexerAddress: sender,
           stake: process.env.TEST_RUN
             ? BigInt(Math.round(Math.random() * 1000))
-            : indexerStakeResponse.indexer.stakedTokens,
+          : indexerStakeResponse.indexer.stakedTokens,
         };
 
         const blocks = new Map();
@@ -237,9 +237,9 @@ const run = async () => {
           console.log(attestations);
 
           const sorted = attestations.sort((a, b) => {
-            if (a.stake > b.stake) {
+            if (a.stake < b.stake) {
               return 1;
-            } else if (a.stake < b.stake) {
+            } else if (a.stake > b.stake) {
               return -1;
             } else {
               return 0;
@@ -247,6 +247,9 @@ const run = async () => {
           });
 
           const topAttestation = sorted[0];
+          console.log(
+            `🥇 NPOI backed by the most stake: ${topAttestation.nPOI}`.cyan
+          );
           const myNPOI = blocks.get((block - 8).toString());
 
           if (topAttestation.nPOI === myNPOI) {
@@ -260,7 +263,7 @@ const run = async () => {
                 block - 8
               }. Local POI is ${myNPOI} and remote POI tied to the most stake is ${
                 topAttestation.nPOI
-              }.`
+              }.`.red
             );
           }
         }
