@@ -25,7 +25,7 @@
     "graphql": "^16.5.0",
     "graphql-request": "^4.3.0",
     "js-waku": "^0.24.0",
-    "node-fetch": "2.6.1",
+    "node-fetch": "3.2.10",
     "protobufjs": "^7.0.0"
   }
 }
