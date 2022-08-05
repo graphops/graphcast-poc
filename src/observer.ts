@@ -1,5 +1,5 @@
 import { Waku } from "js-waku";
-import { WakuMessage } from "js-waku/build/main/proto/waku/v2/message";
+import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
 
 export class Observer {
   wakuInstance: Waku;

@@ -2,6 +2,9 @@
   "compilerOptions": {
     "target": "es2016",
     "module": "commonjs",
+    "declaration": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "./dist",
     "rootDir": "."
