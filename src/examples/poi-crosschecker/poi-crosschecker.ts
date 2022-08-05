@@ -23,7 +23,21 @@ const run = async () => {
   await observer.init();
   await messenger.init();
 
-  const topic = "poi-crosschecker";
+  const topics = [];
+  if (!process.env.TEST_RUN) {
+    const indexerResponse: IndexerResponse = await request(
+      "https://gateway.thegraph.com/network",
+      indexerAllocationsQuery
+    );
+    const allocations = indexerResponse.indexer.allocations;
+
+    for (let i = 0; i < allocations.length; i++) {
+      const subgraph = allocations[i].subgraphDeployment.ipfsHash;
+      topics.push(`/graph-gossip/0/poi-crosschecker/${subgraph}/proto`);
+    }
+  } else {
+    topics.push(`/graph-gossip/0/poi-crosschecker/${process.env.TEST_SUBGRAPH}/proto`);
+  }
 
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const myNPOIs: Map<string, Map<string, string>> = new Map();
@@ -84,7 +98,7 @@ const run = async () => {
           indexerAddress: sender,
           stake: process.env.TEST_RUN
             ? BigInt(Math.round(Math.random() * 1000))
-          : indexerStakeResponse.indexer.stakedTokens,
+            : indexerStakeResponse.indexer.stakedTokens,
         };
 
         const blocks = new Map();
@@ -94,7 +108,7 @@ const run = async () => {
     });
   };
 
-  observer.observe("poi-crosschecker", handler);
+  observer.observe(topics, handler);
 
   const { provider } = ethClient;
 
@@ -141,7 +155,10 @@ const run = async () => {
 
           const Message = root.lookupType("gossip.NPOIMessage");
           const encodedMessage = Message.encode(message).finish();
-          await messenger.sendMessage(encodedMessage, topic);
+          await messenger.sendMessage(
+            encodedMessage,
+            `/graph-gossip/0/poi-crosschecker/${process.env.TEST_SUBGRAPH}/proto`
+          );
         });
       }
     } else {
@@ -193,7 +210,10 @@ const run = async () => {
 
             const Message = root.lookupType("gossip.NPOIMessage");
             const encodedMessage = Message.encode(message).finish();
-            await messenger.sendMessage(encodedMessage, topic);
+            await messenger.sendMessage(
+              encodedMessage,
+              `/graph-gossip/0/poi-crosschecker/${subgraph}/proto`
+            );
           });
         }
       }

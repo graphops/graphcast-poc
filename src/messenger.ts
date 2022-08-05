@@ -14,10 +14,10 @@ export class Messenger {
     this.wakuInstance = waku;
   }
 
-  async sendMessage(encodedMessage: Uint8Array, contentTopic: string) {
+  async sendMessage(encodedMessage: Uint8Array, topic: string) {
     const msg = await WakuMessage.fromBytes(
       encodedMessage,
-      `/graph-gossip/0/${contentTopic}/proto`,
+      topic,
     );
 
     await this.wakuInstance.relay.send(msg);

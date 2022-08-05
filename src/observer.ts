@@ -15,12 +15,12 @@ export class Observer {
     this.wakuInstance = waku;
   }
 
-  observe(contentTopic: string, handler: (msg: Uint8Array) => void): void {
+  observe(topics: string[], handler: (msg: Uint8Array) => void): void {
     this.wakuInstance.relay.addObserver(
       (msg: WakuMessage) => {
         handler(msg.payload);
       },
-      [`/graph-gossip/0/${contentTopic}/proto`]
+      topics
     );
   }
 }
