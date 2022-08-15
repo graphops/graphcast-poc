@@ -1,5 +1,6 @@
 import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
+import "colors";
 
 export const indexerAllocationsQuery = gql`
   query indexers($address: String!) {
@@ -118,7 +119,7 @@ export async function fetchPOI(
     return result.data.proofOfIndexing;
   } catch {
     console.warn(
-      `No POI fetched from the local graph-node for subgraph ${subgraph}.`
+      `⚠️ No POI fetched from the local graph-node for subgraph ${subgraph}.`.yellow
     );
   }
 }

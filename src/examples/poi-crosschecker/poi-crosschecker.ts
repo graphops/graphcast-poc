@@ -1,7 +1,6 @@
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import { gql } from "graphql-tag";
 import { createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
 import { Attestation, IndexerResponse, IndexerStakeResponse } from "./types";
@@ -34,7 +33,7 @@ const run = async () => {
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
-  console.log(`:ear: Initialize POI crosschecker for on-chain allocations:`, {
+  console.log(`\n👂 Initialize POI crosschecker for on-chain allocations:`.green, {
     topics,
   });
 
