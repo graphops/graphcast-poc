@@ -2,23 +2,18 @@ import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
 import { gql } from "graphql-tag";
-import { createClient } from '@urql/core'
-import fetch from 'isomorphic-fetch'
+import { createClient } from "@urql/core";
+import fetch from "isomorphic-fetch";
 import { Attestation, IndexerResponse, IndexerStakeResponse } from "./types";
-import {
-  fetchAllocations,
-  fetchPOI,
-  fetchStake,
-} from "./queries";
+import { fetchAllocations, fetchPOI, fetchStake } from "./queries";
 import { printNPOIs } from "../../utils";
 import "colors";
 import "dotenv/config";
 
-const networkUrl = "https://gateway.thegraph.com/network"
-const client = createClient({url: networkUrl, fetch})
-const graphNodeEndpoint = `http://${process.env.LOCALHOST}:8030/graphql`
-const graphClient = createClient({url: graphNodeEndpoint, fetch})
-
+const networkUrl = "https://gateway.thegraph.com/network";
+const client = createClient({ url: networkUrl, fetch });
+const graphNodeEndpoint = `http://${process.env.LOCALHOST}:8030/graphql`;
+const graphClient = createClient({ url: graphNodeEndpoint, fetch });
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
@@ -30,18 +25,25 @@ const run = async () => {
 
   await observer.init();
   await messenger.init();
-  
-  const allocations = await fetchAllocations(client, process.env.INDEXER_ADDRESS)
-  const deploymentIPFSs = allocations.map(a=>a.subgraphDeployment.ipfsHash)
-  const topics = deploymentIPFSs.map(ipfsHash => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`);
-  console.log(`:ear: Initialize POI crosschecker for on-chain allocations:`, { topics })
+
+  const allocations = await fetchAllocations(
+    client,
+    process.env.INDEXER_ADDRESS
+  );
+  const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
+  const topics = deploymentIPFSs.map(
+    (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
+  );
+  console.log(`:ear: Initialize POI crosschecker for on-chain allocations:`, {
+    topics,
+  });
 
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
 
   const handler = (msg: Uint8Array) => {
     printNPOIs(nPOIs);
-    console.log("👀 My nPOIs:".blue, {localnPOIs});
+    console.log("👀 My nPOIs:".blue, { localnPOIs });
 
     protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
       if (err) {
@@ -64,9 +66,9 @@ const run = async () => {
         `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
           .green
       );
-      
+
       //TODO: key registery pairing, for now directly using sender address to query stake
-      const senderStake = await fetchStake(client, sender)
+      const senderStake = await fetchStake(client, sender);
       const attestation: Attestation = {
         nPOI,
         indexerAddress: sender,
@@ -92,30 +94,36 @@ const run = async () => {
   observer.observe(topics, handler);
 
   const { provider } = ethClient;
-  
+
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   //TODO: add handling for unavailable POIs - send subgraph failure reason or something to alert the rest
-  const getNPOIs = async (block: number, DeploymentIpfses:string[]) => {
+  const getNPOIs = async (block: number, DeploymentIpfses: string[]) => {
     const blockObject = await provider.getBlock(block);
-    const unavailableDplymts = []
+    const unavailableDplymts = [];
     //TODO: parallelize?
     for (let i = 0; i < DeploymentIpfses.length; i++) {
-      const ipfsHash = DeploymentIpfses[i]
-      const localPOI = await fetchPOI(graphClient, ipfsHash, block, blockObject.hash, process.env.INDEXER_ADDRESS)
-      
+      const ipfsHash = DeploymentIpfses[i];
+      const localPOI = await fetchPOI(
+        graphClient,
+        ipfsHash,
+        block,
+        blockObject.hash,
+        process.env.INDEXER_ADDRESS
+      );
+
       if (localPOI == undefined || localPOI == null) {
-        unavailableDplymts.push(ipfsHash)
-      }else {
+        unavailableDplymts.push(ipfsHash);
+      } else {
         //TODO: normalize POI
         protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
           if (err) {
             throw err;
           }
-    
-          const blocks = localnPOIs.get(ipfsHash) ?? new Map()
+
+          const blocks = localnPOIs.get(ipfsHash) ?? new Map();
           blocks.set(block.toString(), localPOI);
           localnPOIs.set(ipfsHash, blocks);
-    
+
           const Message = root.lookupType("gossip.NPOIMessage");
           const message = {
             timestamp: new Date().getTime(),
@@ -130,13 +138,12 @@ const run = async () => {
             `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
           );
         });
-        
       }
-
     }
     console.log(
-      `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraph.`
-        .red, {unavailableDplymts}
+      `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraphs below:`
+        .red,
+      { unavailableDplymts }
     );
   };
 
@@ -151,20 +158,22 @@ const run = async () => {
     }
 
     if (block == compareBlock) {
-      console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue, { localnPOIs });
+      if (localnPOIs.size > 0) {
+        console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue, {
+          localnPOIs,
+        });
+      }
 
       localnPOIs.forEach((blocks, subgraph) => {
         const remoteBlocks = nPOIs.get(subgraph);
-        if (
-          remoteBlocks && 
-          remoteBlocks.size >= 0
-        ) {
+        if (remoteBlocks && remoteBlocks.size >= 0) {
           const attestations = remoteBlocks.get((block - 8).toString());
 
           console.log(
             `📒 Attestations for subgraph ${subgraph} on block ${block - 8}:`
-            .blue, {
-              attestations
+              .blue,
+            {
+              attestations,
             }
           );
 
@@ -202,7 +211,7 @@ const run = async () => {
           console.log(
             `Could not find entries for subgraph ${subgraph} in remote nPOIs. Continuing...`
               .red
-          )
+          );
         }
       });
 
