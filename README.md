@@ -3,7 +3,7 @@ This repo contains a POC for the Gossip Network client,  as well as a single mod
 ## 🏃 Quick start
 📝 **As prerequisites to running the poi-crosschecker POC, make sure that**:
 1. You have a running **graph-node** instance with at least 1 fully synced subgraph.
-2. You've populated the environment variables in the `Dockerfile` - as of right now you only need to put in the IPFS hash of your subgraph as the `TEST_SUBGRAPH` variable and the Ethereum RPC node that you are using as `ETH_NODE`, the value of `INDEXER_ADDRESS` doesn't matter for now, also `TEST_RUN` should be set to `true`.
+2. You've populated the environment variables in the `Dockerfile`.
 3. Have `typescript` installed globally.
 5. Have a Docker daemon running (Docker Desktop if you're on macOS).
 
