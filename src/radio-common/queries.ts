@@ -1,6 +1,10 @@
 import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
 import "colors";
+import {
+  formatGRT,
+} from '@graphprotocol/common-ts'
+import { Dispute } from "./types";
 
 export const indexerAllocationsQuery = gql`
   query indexers($address: String!) {
@@ -17,12 +21,25 @@ export const indexerAllocationsQuery = gql`
 `;
 
 export const indexerStakeQuery = gql`
-  query indexers($addresses: [String!]!) {
-    indexers(where: { id_in: $addresses }) {
-      id
+  query indexers($address: String!) {
+    indexer(id: $address) {
       stakedTokens
     }
   }
+`;
+
+export const disputeIndexerQuery = gql`
+query disputes($address: String!) {
+  disputes(where: {
+    indexer: $address,
+    status_in: [Accepted, Undecided]
+  }){
+    id
+    status
+    tokensSlashed
+  }
+}
+
 `;
 
 export const poiQuery = (
@@ -56,49 +73,65 @@ export const poiQuery = (
 
 export async function fetchAllocations(client: Client, address: string) {
   try {
-    //TODO: remove constant hardcoded address to variable
     const result = await client
-      .query(indexerAllocationsQuery, { address: address })
+      .query(indexerAllocationsQuery, { address })
       .toPromise();
     if (result.error) {
-      throw result.error;
+      throw result.error
     }
-    return result.data.indexer.allocations;
-  } catch {
-    console.warn(`No allocation fetched`);
-    return [];
+    return result.data.indexer.allocations
+  } catch (error) {
+      console.warn(`No allocation fetched, check connection and address`)
+      return []
   }
 }
 
-export async function fetchStakes(client: Client, addresses: string[]) {
+export async function fetchDisputes(client: Client, address: string) : Promise<Dispute[]> {
   try {
-    //TODO: remove constant hardcoded address to variable
     const result = await client
-      .query(indexerStakeQuery, { addresses: addresses })
+      .query(disputeIndexerQuery, { address })
       .toPromise();
     if (result.error) {
-      throw result.error;
+      throw result.error
     }
-    return result.data.indexers;
-  } catch {
-    console.warn(`No stake fetched`);
-    return [];
+    return result.data.disputes
+  } catch (error) {
+      console.warn(`No disputes fetched, assume nothing...?`)
+      return []
   }
 }
 
 export async function fetchStake(client: Client, address: string) {
   try {
-    //TODO: remove constant hardcoded address to variable
     const result = await client
-      .query(indexerStakeQuery, { addresses: [address] })
+      .query(indexerStakeQuery, { address })
       .toPromise();
     if (result.error) {
       throw result.error;
     }
-    return result.data.indexers[0].stakedTokens;
-  } catch {
-    console.warn(`No stake fetched for indexer ${address}`);
-    return 0;
+    return result.data.indexer.stakedTokens
+  } catch (error) {
+    console.warn(`No stake fetched for indexer ${address}, assuming 0`)
+    return 0
+  }
+}
+
+export async function fetchMinStake(client: Client) {
+  try {
+    const result = await client
+      .query(gql`
+      {
+        graphNetwork(id:"1"){
+          minimumIndexerStake
+        }
+      }`)
+      .toPromise();
+    if (result.error) {
+      throw result.error;
+    }
+    return result.data.graphNetwork.minimumIndexerStake
+  } catch (error) {
+    throw new Error(`Failed to fetch minimum indexer stake requirement`)
   }
 }
 
