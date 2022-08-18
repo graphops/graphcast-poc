@@ -15,10 +15,7 @@ export class Messenger {
   }
 
   async sendMessage(encodedMessage: Uint8Array, topic: string) {
-    const msg = await WakuMessage.fromBytes(
-      encodedMessage,
-      topic,
-    );
+    const msg = await WakuMessage.fromBytes(encodedMessage, topic);
 
     await this.wakuInstance.relay.send(msg);
   }

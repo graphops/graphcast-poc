@@ -5,8 +5,8 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import { Attestation, IndexerResponse, IndexerStakeResponse } from "../../radio-common/types";
-import { fetchAllocations, fetchMinStake, fetchPOI, fetchStake } from "../../radio-common/queries";
+import { Attestation } from "../../radio-common/types";
+import { fetchAllocations, fetchPOI } from "../../radio-common/queries";
 import { printNPOIs } from "../../utils";
 import RadioFilter from "../../radio-common/customs";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -20,12 +20,12 @@ const run = async () => {
   await observer.init();
   await messenger.init();
 
-  const client = createClient({url: process.env.NETWORK_URL, fetch})
-  const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`
-  const graphClient = createClient({url: graphNodeEndpoint, fetch})
-  
-  const radioFilter = new RadioFilter()
-  radioFilter.setRequirement(client)
+  const client = createClient({ url: process.env.NETWORK_URL, fetch });
+  const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
+  const graphClient = createClient({ url: graphNodeEndpoint, fetch });
+
+  const radioFilter = new RadioFilter();
+  radioFilter.setRequirement(client);
 
   const allocations = await fetchAllocations(
     client,
@@ -35,9 +35,12 @@ const run = async () => {
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
-  console.log(`\n👂 Initialize POI crosschecker for on-chain allocations:`.green, {
-    topics,
-  });
+  console.log(
+    `\n👂 Initialize POI crosschecker for on-chain allocations:`.green,
+    {
+      topics,
+    }
+  );
 
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
@@ -51,11 +54,11 @@ const run = async () => {
         throw err;
       }
 
-      let message
+      let message;
       try {
         const Message = root.lookupType("gossip.NPOIMessage");
         const decodedMessage = Message.decode(msg);
-  
+
         message = Message.toObject(decodedMessage, {
           timestamp: Number,
           blockNumber: Number,
@@ -63,10 +66,11 @@ const run = async () => {
           nPOI: String,
           sender: String,
         });
-
-      } catch(error) {
-        console.error(`Protobuf reader could not decode message, assume corrupted`)
-        return
+      } catch (error) {
+        console.error(
+          `Protobuf reader could not decode message, assume corrupted`
+        );
+        return;
       }
 
       const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
@@ -76,18 +80,19 @@ const run = async () => {
       );
 
       // Message Validity (identity, time, stake, dispute) for which to skip by returning early
-      const senderStake = await radioFilter.poiMsgChecks(client, sender, timestamp)
-      if (senderStake <= 0){
+      const senderStake = await radioFilter.poiMsgChecks(
+        client,
+        sender,
+        timestamp
+      );
+      if (senderStake <= 0) {
         console.warn(
           `\nMessage considered compromised, intercepting - invalid sender\n`
             .red
         );
-        return
+        return;
       }
-      console.info(
-        `Storing attestation`
-          .blue, {senderStake}
-      );
+      console.info(`Storing attestation`.blue, { senderStake });
       const attestation: Attestation = {
         nPOI,
         indexerAddress: sender,
@@ -159,10 +164,11 @@ const run = async () => {
         });
       }
     }
-    if (unavailableDplymts.length > 0){
+    if (unavailableDplymts.length > 0) {
       console.log(
         `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraphs below:`
-          .red, { unavailableDplymts }
+          .red,
+        { unavailableDplymts }
       );
     }
   };
@@ -188,9 +194,13 @@ const run = async () => {
         const remoteBlocks = nPOIs.get(subgraph);
         if (remoteBlocks && remoteBlocks.size >= 0) {
           const attestations = remoteBlocks.get((block - 8).toString());
-          if (!attestations){
-            console.log(`No attestations for $(subgraph) on block ${block - 8} at the moment`)
-            return
+          if (!attestations) {
+            console.log(
+              `No attestations for $(subgraph) on block ${
+                block - 8
+              } at the moment`
+            );
+            return;
           }
 
           console.log(
