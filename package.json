@@ -5,9 +5,11 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint '*/**/*.ts'",
+    "format": "prettier --write src/*",
     "build": "tsc -b",
     "watch": "tsc-watch --onSuccess \"npm start\"",
-    "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js"
+    "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js",
+    "prepare": "husky install"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",
@@ -16,7 +18,10 @@
     "@typescript-eslint/parser": "^5.30.6",
     "@urql/core": "^2.6.1",
     "eslint": "^8.19.0",
+    "husky": ">=6",
     "isomorphic-fetch": "3.0.0",
+    "lint-staged": ">=10",
+    "prettier": "^2.7.1",
     "tsc-watch": "^5.0.3",
     "typescript": "^4.7.4"
   },
@@ -31,5 +36,9 @@
     "js-waku": "^0.24.0",
     "node-fetch": "3.2.10",
     "protobufjs": "^7.0.0"
+  },
+  "lint-staged": {
+    "*.js": "eslint --cache --fix",
+    "*.src/*": "prettier --write"
   }
 }
