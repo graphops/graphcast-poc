@@ -1,6 +1,15 @@
 # Gossip Client POC
-This repo contains a POC for the Gossip Network client,  as well as a single Radio example - a POI cross-checker.
-## 🏃 Quick start
+
+## 📯 Introduction
+This repo contains a POC for the Gossip Network client,  as well as a single Radio example - a POI cross-checker. 
+
+The key requirement for an indexer to earn indexing rewards is to submit a valid Proof of Indexing promptly. The importance of valid POIs causes many indexers to alert each other on subgraph health in community discussions. To alleviate the indexer workload, this Radio can aggregate and exchange POI along with a list of indexer on-chain identities that can be used to trace reputations. With the pubsub pattern, the indexer can effectively automatically close an allocation when some trusted indexer(s) publishes a different POI or alert subgraph syncing failure. 
+
+## 📝 Features
+- Showcases the Gossip Client with the help of a real-world example - a POI cross-checker
+- Serves as a full demo of the most critical pieces of the Gossip Client
+
+## 🏃 Quickstart
 📝 **As prerequisites to running the poi-crosschecker POC, make sure that**:
 1. You have a running **graph-node** instance with at least 1 fully synced subgraph.
 2. You've populated the environment variables in the `Dockerfile`.
@@ -9,8 +18,14 @@ This repo contains a POC for the Gossip Network client,  as well as a single Rad
 
 🚀 **To run the Gossip client along with the poi-crosschecker Radio, run the following command**:
 ```
-docker build -t poi-crosschecker . && docker run -e "TERM=xterm-256color" poi-crosschecker
+docker build -t poi-crosschecker . && docker run poi-crosschecker
 ```
+
+## 🎚️ Configuring
+Currently the only way to change the base configuration of the Gossip Client is to change the environment variables in the `Dockerfile` - `INDEXER_ADDRESS`, `GRAPH_NODE_HOST`, `ETH_NODE` and `NETWORK_URL`. That should be enough in terms of flexibility for now.
+
+## 🆕 Upgrading
+Updates to this POC will be merged into the `main` branch once their respective PR has been approved. The POC will not be distributed as a npm package or as releases on Github, since at this stage it is not recommended to be used in production.
 
 ## 🛠️ How it works
 There are two main components to this POC, one is the *base layer*, which will eventually be the core of the actual Gossip Client SDK, the other one is an example of how to build on top of that base layer and create Radios. In this example, the Radio is a simple POI cross-checker. 
