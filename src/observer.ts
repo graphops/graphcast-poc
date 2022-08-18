@@ -16,11 +16,8 @@ export class Observer {
   }
 
   observe(topics: string[], handler: (msg: Uint8Array) => void): void {
-    this.wakuInstance.relay.addObserver(
-      (msg: WakuMessage) => {
-        handler(msg.payload);
-      },
-      topics
-    );
+    this.wakuInstance.relay.addObserver((msg: WakuMessage) => {
+      handler(msg.payload);
+    }, topics);
   }
 }

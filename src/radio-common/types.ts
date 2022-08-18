@@ -1,32 +1,32 @@
 export type Allocation = {
-    subgraphDeployment: {
-        id: string,
-        ipfsHash: string
-    }
-}
+  subgraphDeployment: {
+    id: string;
+    ipfsHash: string;
+  };
+};
 
 export type Indexer = {
-    allocations: Allocation[],
-}
+  allocations: Allocation[];
+};
 
 export type IndexerResponse = {
-    indexer: Indexer,
+  indexer: Indexer;
 };
 
 export type IndexerStakeResponse = {
-    indexer: {
-        stakedTokens: bigint
-    },
+  indexer: {
+    stakedTokens: bigint;
+  };
 };
 
 export type Attestation = {
-    nPOI: string,
-    indexerAddress: string,
-    stake: bigint,
-}
+  nPOI: string;
+  indexerAddress: string;
+  stake: bigint;
+};
 
 export type Dispute = {
-    id: string,
-    status: string,
-    tokensSlashed: bigint,
-}
+  id: string;
+  status: string;
+  tokensSlashed: bigint;
+};
