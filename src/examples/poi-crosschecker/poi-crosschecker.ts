@@ -1,19 +1,14 @@
+import { createClient } from "@urql/core";
+import fetch from "isomorphic-fetch";
+import "colors";
+import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import { createClient } from "@urql/core";
-import fetch from "isomorphic-fetch";
-import { Attestation, IndexerResponse, IndexerStakeResponse } from "./types";
-import { fetchAllocations, fetchPOI, fetchStake } from "./queries";
+import { Attestation, IndexerResponse, IndexerStakeResponse } from "../../radio-common/types";
+import { fetchAllocations, fetchMinStake, fetchPOI, fetchStake } from "../../radio-common/queries";
 import { printNPOIs } from "../../utils";
-import "colors";
-import "dotenv/config";
-
-const networkUrl = "https://gateway.thegraph.com/network";
-const client = createClient({ url: networkUrl, fetch });
-const graphNodeEndpoint = `http://${process.env.LOCALHOST}:8030/graphql`;
-const graphClient = createClient({ url: graphNodeEndpoint, fetch });
-
+import RadioFilter from "../../radio-common/customs";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
 
@@ -24,6 +19,13 @@ const run = async () => {
 
   await observer.init();
   await messenger.init();
+
+  const client = createClient({url: process.env.NETWORK_URL, fetch})
+  const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`
+  const graphClient = createClient({url: graphNodeEndpoint, fetch})
+  
+  const radioFilter = new RadioFilter()
+  radioFilter.setRequirement(client)
 
   const allocations = await fetchAllocations(
     client,
@@ -49,16 +51,23 @@ const run = async () => {
         throw err;
       }
 
-      const Message = root.lookupType("gossip.NPOIMessage");
-      const decodedMessage = Message.decode(msg);
+      let message
+      try {
+        const Message = root.lookupType("gossip.NPOIMessage");
+        const decodedMessage = Message.decode(msg);
+  
+        message = Message.toObject(decodedMessage, {
+          timestamp: Number,
+          blockNumber: Number,
+          subgraph: String,
+          nPOI: String,
+          sender: String,
+        });
 
-      const message = Message.toObject(decodedMessage, {
-        timestamp: Number,
-        blockNumber: Number,
-        subgraph: String,
-        nPOI: String,
-        sender: String,
-      });
+      } catch(error) {
+        console.error(`Protobuf reader could not decode message, assume corrupted`)
+        return
+      }
 
       const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
       console.info(
@@ -66,12 +75,23 @@ const run = async () => {
           .green
       );
 
-      //TODO: key registery pairing, for now directly using sender address to query stake
-      const senderStake = await fetchStake(client, sender);
+      // Message Validity (identity, time, stake, dispute) for which to skip by returning early
+      const senderStake = await radioFilter.poiMsgChecks(client, sender, timestamp)
+      if (senderStake <= 0){
+        console.warn(
+          `\nMessage considered compromised, intercepting - invalid sender\n`
+            .red
+        );
+        return
+      }
+      console.info(
+        `Storing attestation`
+          .blue, {senderStake}
+      );
       const attestation: Attestation = {
         nPOI,
         indexerAddress: sender,
-        stake: senderStake,
+        stake: BigInt(senderStake),
       };
       if (nPOIs.has(subgraph)) {
         const blocks = nPOIs.get(subgraph);
@@ -96,7 +116,7 @@ const run = async () => {
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   //TODO: add handling for unavailable POIs - send subgraph failure reason or something to alert the rest
-  const getNPOIs = async (block: number, DeploymentIpfses: string[]) => {
+  const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
     const blockObject = await provider.getBlock(block);
     const unavailableDplymts = [];
     //TODO: parallelize?
@@ -127,7 +147,7 @@ const run = async () => {
           const message = {
             timestamp: new Date().getTime(),
             blockNumber: block,
-            ipfsHash,
+            subgraph: ipfsHash,
             nPOI: localPOI,
             sender: process.env.INDEXER_ADDRESS,
           };
@@ -139,11 +159,12 @@ const run = async () => {
         });
       }
     }
-    console.log(
-      `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraphs below:`
-        .red,
-      { unavailableDplymts }
-    );
+    if (unavailableDplymts.length > 0){
+      console.log(
+        `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraphs below:`
+          .red, { unavailableDplymts }
+      );
+    }
   };
 
   let compareBlock = 0;
@@ -152,7 +173,7 @@ const run = async () => {
 
     if (block % 5 === 0) {
       // Going 5 blocks back as a buffer to make sure the node is fully synced
-      getNPOIs(block - 5, deploymentIPFSs);
+      sendNPOIs(block - 5, deploymentIPFSs);
       compareBlock = block + 3;
     }
 
@@ -167,6 +188,10 @@ const run = async () => {
         const remoteBlocks = nPOIs.get(subgraph);
         if (remoteBlocks && remoteBlocks.size >= 0) {
           const attestations = remoteBlocks.get((block - 8).toString());
+          if (!attestations){
+            console.log(`No attestations for $(subgraph) on block ${block - 8} at the moment`)
+            return
+          }
 
           console.log(
             `📒 Attestations for subgraph ${subgraph} on block ${block - 8}:`
@@ -190,9 +215,9 @@ const run = async () => {
           console.log(
             `🥇 NPOI backed by the most stake: ${topAttestation.nPOI}`.cyan
           );
-          const myNPOI = blocks.get((block - 8).toString());
+          const localNPOI = blocks.get((block - 8).toString());
 
-          if (topAttestation.nPOI === myNPOI) {
+          if (topAttestation.nPOI === localNPOI) {
             console.log(
               `✅ POIs match for subgraph ${subgraph} on block ${block - 8}.`
                 .green
@@ -201,7 +226,7 @@ const run = async () => {
             console.log(
               `❌ POIS do not match for subgraph ${subgraph} on block ${
                 block - 8
-              }. Local POI is ${myNPOI} and remote POI tied to the most stake is ${
+              }. Local POI is ${localNPOI} and remote POI tied to the most stake is ${
                 topAttestation.nPOI
               }.`.red
             );

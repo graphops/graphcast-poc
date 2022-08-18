@@ -24,3 +24,9 @@ export type Attestation = {
     indexerAddress: string,
     stake: bigint,
 }
+
+export type Dispute = {
+    id: string,
+    status: string,
+    tokensSlashed: bigint,
+}
