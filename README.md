@@ -31,3 +31,7 @@ At the same time, other Indexers running the client will start doing the same, w
 After another interval (3 blocks in the current example) we compare our *local* POIs with the *remote* ones. We sort the remote ones so that for each subgraph (on each block) we can take the POI that is backed by the most on-chain stake (❗ This does not mean the one that is sent by the Indexer with the highest stake, but rather the one that has the most **combined** stake of all the Indexers that attested to it). After we have that top POI, we compare it with our *local* POI for that subgraph at that block. Voilà! We now know whether our POI matches with the current consensus on the network.
 
 [![](https://mermaid.ink/img/pako:eNptz8EKwjAMBuBXKTkpbC-wg7A5j17cbtZDaUJXtrajawXZ9u5WhyBoTsnPR0hmkA4JClBejB1ra25ZqvJ6HDTZcGN5flguJEnfCdmZpkkomhZW7c4O40D7f74anOxZ67VS5H9s9TYN2e99JWRgyBuhMR0zvySH0JEhDkVqUfieA7drcnFEEeiEOjgPRfCRMhAxuOZh5WfeTK1F-sts4foEUQJOKQ)](https://mermaid.live/edit#pako:eNptz8EKwjAMBuBXKTkpbC-wg7A5j17cbtZDaUJXtrajawXZ9u5WhyBoTsnPR0hmkA4JClBejB1ra25ZqvJ6HDTZcGN5flguJEnfCdmZpkkomhZW7c4O40D7f74anOxZ67VS5H9s9TYN2e99JWRgyBuhMR0zvySH0JEhDkVqUfieA7drcnFEEeiEOjgPRfCRMhAxuOZh5WfeTK1F-sts4foEUQJOKQ)
+
+## Contributing
+
+We welcome and appreciate your contributions! Please see the [Contributor Guide](/CONTRIBUTING.md), [Code Of Conduct](/CODE_OF_CONDUCT.md) and [Security Notes](/SECURITY.md) for this repository.
