@@ -1,20 +1,38 @@
 import { Client } from "@urql/core";
-import { fetchDisputes, fetchMinStake, fetchStake } from "./queries";
+import {
+  fetchDisputes,
+  fetchMinStake,
+  fetchOperators,
+  fetchStake,
+  fetchOperatorOfIndexers,
+} from "./queries";
+import { formatGRT } from "@graphprotocol/common-ts";
+import { EthClient } from "../ethClient";
 
+const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
-  client: Client;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  msgReplayReq: number;
   minStakeReq: number;
-  msgReplayReq = 3600000;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  constructor() {}
+  constructor() {
+    this.msgReplayReq = ONE_HOUR;
+    this.minStakeReq;
+  }
 
-  public async setRequirement(client) {
+  public async setRequirement(client: Client) {
     this.minStakeReq = await fetchMinStake(client);
+  }
+
+  public async isOperator(client: Client, indexer: string, sender: string) {
+    return (await fetchOperators(client, indexer)).includes(sender);
   }
 
   public async indexerCheck(client: Client, address: string) {
     const senderStake = await fetchStake(client, address);
+    if (!this.minStakeReq) {
+      this.setRequirement(client);
+    }
     if (senderStake < this.minStakeReq) {
       console.error(
         `Identity does not satisfy the minimum indexer stake, message discarded.`,
@@ -42,27 +60,45 @@ export default class RadioFilter {
     );
   }
 
-  public async poiMsgChecks(client: Client, sender: string, timestamp: number) {
+  public async poiMsgValidity(
+    client: Client,
+    sender: string,
+    timestamp: number,
+    senderIndexer: string
+  ) {
     // Check for POI message validity
-    //TODO: Resolve signer to indexer identity via registry, for now directly using sender address to query stake
+    // Resolve signer to indexer identity via registry
+    const isOperator = await this.isOperator(client, senderIndexer, sender);
+    // Double check - this way seems better such no indexer address is needed
+    const matchedIndexer = await fetchOperatorOfIndexers(client, sender);
+    if (!matchedIndexer.includes(senderIndexer)) {
+      console.info(
+        `No match between the graph account of gossip client and supposed indexer address`
+      );
+    }
 
     // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
-    const senderStake = await this.indexerCheck(client, sender);
-    // Check that sender is not currently in any disputes...?
+    const senderStake = await this.indexerCheck(client, senderIndexer);
+
+    // Check that sender is not currently in any disputes?
     // Simple: don't trust senders with token slashed history
-    const tokensSlashed = await this.disputeStatusCheck(client, sender);
+    const tokensSlashed = await this.disputeStatusCheck(client, senderIndexer);
+
+    console.debug(
+      `Verifying message params, for now skip opeartor check before changing message format `,
+      {
+        isOperator,
+        senderStake,
+        tokensSlashed,
+        replyAttack: !this.replyThreshold(timestamp),
+      }
+    );
     // Message reply attack checks on timestamp, assume a 1 hour constant (3600000ms)
     if (
       senderStake == 0 ||
       !this.replyThreshold(timestamp) ||
       tokensSlashed > 0
     ) {
-      console.debug(`Verifying message params`, {
-        senderStake,
-        tokensSlashed,
-        attack: !this.replyThreshold(timestamp),
-        msgAge: new Date().getTime() - timestamp,
-      });
       return 0;
     }
     return senderStake - tokensSlashed;

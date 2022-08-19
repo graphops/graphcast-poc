@@ -1,10 +1,12 @@
 import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
 import "colors";
+import { formatGRT } from "@graphprotocol/common-ts";
 import { Dispute } from "./types";
 
+//TODO: condense for better and more efficient query and cache
 export const indexerAllocationsQuery = gql`
-  query indexers($address: String!) {
+  query indexer($address: String!) {
     indexer(id: $address) {
       allocations {
         allocatedTokens
@@ -18,7 +20,7 @@ export const indexerAllocationsQuery = gql`
 `;
 
 export const indexerStakeQuery = gql`
-  query indexers($address: String!) {
+  query indexer($address: String!) {
     indexer(id: $address) {
       stakedTokens
     }
@@ -31,6 +33,31 @@ export const disputeIndexerQuery = gql`
       id
       status
       tokensSlashed
+    }
+  }
+`;
+
+export const operatorOfIndexerQuery = gql`
+  query gossipOperatorOf($address: String!) {
+    graphAccount(id: $address) {
+      gossipOperatorOf {
+        id
+        indexer {
+          id
+        }
+      }
+    }
+  }
+`;
+
+export const indexerOperatorQuery = gql`
+  query indexer($address: String!) {
+    indexer(id: $address) {
+      account {
+        gossipOperators {
+          id
+        }
+      }
     }
   }
 `;
@@ -97,6 +124,24 @@ export async function fetchDisputes(
   }
 }
 
+export async function fetchOperators(
+  client: Client,
+  address: string
+): Promise<string[]> {
+  try {
+    const result = await client
+      .query(indexerOperatorQuery, { address })
+      .toPromise();
+    if (result.error) {
+      throw result.error;
+    }
+    return result.data.indexer.account.gossipOperators;
+  } catch (error) {
+    console.warn(`No operators fetched, assume empty`, { error });
+    return [];
+  }
+}
+
 export async function fetchStake(client: Client, address: string) {
   try {
     const result = await client
@@ -109,6 +154,25 @@ export async function fetchStake(client: Client, address: string) {
   } catch (error) {
     console.warn(`No stake fetched for indexer ${address}, assuming 0`);
     return 0;
+  }
+}
+
+export async function fetchOperatorOfIndexers(client: Client, address: string) {
+  try {
+    const result = await client
+      .query(operatorOfIndexerQuery, { address })
+      .toPromise();
+    if (result.error) {
+      throw result.error;
+    }
+    return result.data.graphAccount.gossipOperatorOf.map(
+      (account) => account.indexer.id
+    );
+  } catch (error) {
+    console.warn(
+      `Did not find corresponding indexer address for the gossip operator`
+    );
+    return null;
   }
 }
 

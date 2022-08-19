@@ -5,8 +5,18 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import { Attestation } from "../../radio-common/types";
-import { fetchAllocations, fetchPOI } from "../../radio-common/queries";
+import {
+  Attestation,
+  IndexerResponse,
+  IndexerStakeResponse,
+} from "../../radio-common/types";
+import {
+  fetchAllocations,
+  fetchMinStake,
+  fetchOperators,
+  fetchPOI,
+  fetchStake,
+} from "../../radio-common/queries";
 import { printNPOIs } from "../../utils";
 import RadioFilter from "../../radio-common/customs";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -21,12 +31,22 @@ const run = async () => {
   await messenger.init();
 
   const client = createClient({ url: process.env.NETWORK_URL, fetch });
+  const registryClient = createClient({
+    url: process.env.REGISTRY_SUBGRAPH,
+    fetch,
+  });
   const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
   const graphClient = createClient({ url: graphNodeEndpoint, fetch });
+  const { provider, goerliProvider, registryContract } = ethClient;
 
   const radioFilter = new RadioFilter();
-  radioFilter.setRequirement(client);
-
+  // Check self in the registry
+  // const operatorStatus = await ethClient.checkRegistry(process.env.INDEXER_ADDRESS, process.env.RADIO_OPERATOR)
+  const isOperator = await radioFilter.isOperator(
+    client,
+    process.env.INDEXER_ADDRESS,
+    process.env.RADIO_OPERATOR
+  );
   const allocations = await fetchAllocations(
     client,
     process.env.INDEXER_ADDRESS
@@ -36,8 +56,10 @@ const run = async () => {
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
   console.log(
-    `\n👂 Initialize POI crosschecker for on-chain allocations:`.green,
+    `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
+      .green,
     {
+      isOperator,
       topics,
     }
   );
@@ -79,11 +101,12 @@ const run = async () => {
           .green
       );
 
-      // Message Validity (identity, time, stake, dispute) for which to skip by returning early
-      const senderStake = await radioFilter.poiMsgChecks(
-        client,
+      // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
+      const senderStake = await radioFilter.poiMsgValidity(
+        registryClient,
         sender,
-        timestamp
+        timestamp,
+        sender
       );
       if (senderStake <= 0) {
         console.warn(
@@ -92,12 +115,13 @@ const run = async () => {
         );
         return;
       }
-      console.info(`Storing attestation`.blue, { senderStake });
+
       const attestation: Attestation = {
         nPOI,
         indexerAddress: sender,
-        stake: BigInt(senderStake),
+        stake: BigInt(BigInt(senderStake)),
       };
+      console.debug(`Valid message, caching attestation`, { attestation });
       if (nPOIs.has(subgraph)) {
         const blocks = nPOIs.get(subgraph);
         if (blocks.has(blockNumber.toString())) {
@@ -117,10 +141,7 @@ const run = async () => {
 
   observer.observe(topics, handler);
 
-  const { provider } = ethClient;
-
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
-  //TODO: add handling for unavailable POIs - send subgraph failure reason or something to alert the rest
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
     const blockObject = await provider.getBlock(block);
     const unavailableDplymts = [];
@@ -136,7 +157,10 @@ const run = async () => {
       );
 
       if (localPOI == undefined || localPOI == null) {
+        //TODO: SetCostModel for the POI to a ridiculously high price
         unavailableDplymts.push(ipfsHash);
+        //Connect to indexer management server - (can build network subgraph from this by allowing local indexer-service to serve
+        //Construct setCostModel mutation and send to server, check responses
       } else {
         //TODO: normalize POI
         protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
