@@ -6,7 +6,7 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
     console.log("😔 State is empty.".blue);
   }
   nPOIs.forEach((blocks, subgraph) => {
-    console.trace(`\n📝 Printing nPOIs for subgraph ${subgraph}:`.blue);
+    console.debug(`\n📝 Printing nPOIs for subgraph ${subgraph}:`.blue);
     blocks.forEach((attestations, block) => {
       console.log(`🔍  Attestations for block ${block}:`.cyan);
       attestations.forEach((a) => {
@@ -18,3 +18,14 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
     });
   });
 };
+
+export const sortAttestations = (attestations: Attestation[]) =>
+  attestations.sort((a, b) => {
+    if (a.stake < b.stake) {
+      return 1;
+    } else if (a.stake > b.stake) {
+      return -1;
+    } else {
+      return 0;
+    }
+  });

@@ -24,13 +24,12 @@ export default class RadioFilter {
     this.minStakeReq = await fetchMinStake(client);
   }
 
-  public async isOperator(client: Client, indexer: string, sender: string) {
-    return (await fetchOperatorOfIndexers(client, sender)).includes(indexer);
+  public async isOperatorOf(client: Client, sender: string) {
+    return await fetchOperatorOfIndexers(client, sender);
   }
 
-  public async isOperatorOf(client: Client, sender: string) {
-    console.log(`isOperatorOf`, {sender, opeartorOf: await fetchOperatorOfIndexers(client, sender)})
-    return (await fetchOperatorOfIndexers(client, sender)).length !== 0;
+  public async isOperator(client: Client, sender: string) {
+    return (await this.isOperatorOf(client, sender)).length !== 0;
   }
 
   public async indexerCheck(client: Client, address: string) {
@@ -68,29 +67,36 @@ export default class RadioFilter {
   public async poiMsgValidity(
     client: Client,
     sender: string,
-    timestamp: number,
-    senderIndexer: string
+    timestamp: number
   ) {
     // Check for POI message validity
 
     // Resolve signer to indexer identity via registry
-    const isOperatorOf = await this.isOperatorOf(client, sender);
-    
+    const isOperator = await this.isOperator(client, sender);
+    //TODO: skipping for easier ease of testing on other indexers
+    const indexer = isOperator
+      ? (await this.isOperatorOf(client, sender))[0]
+      : sender;
+
     // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
-    const senderStake = await this.indexerCheck(client, senderIndexer);
+    const senderStake = await this.indexerCheck(client, indexer);
 
     // Check that sender is not currently in any disputes?
     // Simple: don't trust senders with token slashed history
-    const tokensSlashed = await this.disputeStatusCheck(client, senderIndexer);
+    const tokensSlashed = await this.disputeStatusCheck(client, indexer);
 
-    console.info(
-      `Verifying message params, (TODO: Add skip opeartor check after updating the message format)`,
+    console.debug(
+      `Verifying message params, (TODO: Add skip opeartor check after updating the message format)`
+        .grey,
       {
-        isOperatorOf,
+        isOperator,
+        indexer,
         senderStake,
         tokensSlashed,
         replyAttack: !this.replyThreshold(timestamp),
-        operatorWarning: !isOperatorOf ? `No match between the graph account of gossip client and supposed indexer address` : undefined
+        operatorWarning: !isOperator
+          ? `No match between the graph account of gossip client and supposed indexer address`
+          : null,
       }
     );
     // Message reply attack checks on timestamp, assume a 1 hour constant (3600000ms)
