@@ -40,6 +40,7 @@ export const disputeIndexerQuery = gql`
 export const operatorOfIndexerQuery = gql`
   query gossipOperatorOf($address: String!) {
     graphAccount(id: $address) {
+      id
       gossipOperatorOf {
         id
         indexer {
@@ -137,7 +138,7 @@ export async function fetchOperators(
     }
     return result.data.indexer.account.gossipOperators;
   } catch (error) {
-    console.warn(`No operators fetched, assume empty`, { error });
+    console.warn(`No operators fetched, assume none`, { error });
     return [];
   }
 }

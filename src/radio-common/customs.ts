@@ -25,7 +25,12 @@ export default class RadioFilter {
   }
 
   public async isOperator(client: Client, indexer: string, sender: string) {
-    return (await fetchOperators(client, indexer)).includes(sender);
+    return (await fetchOperatorOfIndexers(client, sender)).includes(indexer);
+  }
+
+  public async isOperatorOf(client: Client, sender: string) {
+    console.log(`isOperatorOf`, {sender, opeartorOf: await fetchOperatorOfIndexers(client, sender)})
+    return (await fetchOperatorOfIndexers(client, sender)).length !== 0;
   }
 
   public async indexerCheck(client: Client, address: string) {
@@ -67,16 +72,10 @@ export default class RadioFilter {
     senderIndexer: string
   ) {
     // Check for POI message validity
-    // Resolve signer to indexer identity via registry
-    const isOperator = await this.isOperator(client, senderIndexer, sender);
-    // Double check - this way seems better such no indexer address is needed
-    const matchedIndexer = await fetchOperatorOfIndexers(client, sender);
-    if (!matchedIndexer.includes(senderIndexer)) {
-      console.info(
-        `No match between the graph account of gossip client and supposed indexer address`
-      );
-    }
 
+    // Resolve signer to indexer identity via registry
+    const isOperatorOf = await this.isOperatorOf(client, sender);
+    
     // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
     const senderStake = await this.indexerCheck(client, senderIndexer);
 
@@ -84,13 +83,14 @@ export default class RadioFilter {
     // Simple: don't trust senders with token slashed history
     const tokensSlashed = await this.disputeStatusCheck(client, senderIndexer);
 
-    console.debug(
-      `Verifying message params, for now skip opeartor check before changing message format `,
+    console.info(
+      `Verifying message params, (TODO: Add skip opeartor check after updating the message format)`,
       {
-        isOperator,
+        isOperatorOf,
         senderStake,
         tokensSlashed,
         replyAttack: !this.replyThreshold(timestamp),
+        operatorWarning: !isOperatorOf ? `No match between the graph account of gossip client and supposed indexer address` : undefined
       }
     );
     // Message reply attack checks on timestamp, assume a 1 hour constant (3600000ms)

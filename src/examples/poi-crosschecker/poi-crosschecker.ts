@@ -12,10 +12,7 @@ import {
 } from "../../radio-common/types";
 import {
   fetchAllocations,
-  fetchMinStake,
-  fetchOperators,
   fetchPOI,
-  fetchStake,
 } from "../../radio-common/queries";
 import { printNPOIs } from "../../utils";
 import RadioFilter from "../../radio-common/customs";
@@ -43,7 +40,7 @@ const run = async () => {
   // Check self in the registry
   // const operatorStatus = await ethClient.checkRegistry(process.env.INDEXER_ADDRESS, process.env.RADIO_OPERATOR)
   const isOperator = await radioFilter.isOperator(
-    client,
+    registryClient,
     process.env.INDEXER_ADDRESS,
     process.env.RADIO_OPERATOR
   );
