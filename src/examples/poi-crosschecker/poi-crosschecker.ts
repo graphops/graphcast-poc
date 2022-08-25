@@ -32,7 +32,7 @@ const run = async () => {
   });
   const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
   const graphClient = createClient({ url: graphNodeEndpoint, fetch });
-  const { provider, goerliProvider, registryContract } = ethClient;
+  const { provider } = ethClient;
   const indexerClient = createClient({
     url: `http://${process.env.INDEXER_MANAGERMENT_SERVER}`,
     fetch,
