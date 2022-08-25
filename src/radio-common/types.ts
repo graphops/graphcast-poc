@@ -30,3 +30,9 @@ export type Dispute = {
   status: string;
   tokensSlashed: bigint;
 };
+
+export type CostModel = {
+  deployment: string;
+  model: string;
+  variables?: string;
+};

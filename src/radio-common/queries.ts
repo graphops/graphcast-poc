@@ -1,8 +1,7 @@
 import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
 import "colors";
-import { formatGRT } from "@graphprotocol/common-ts";
-import { Dispute } from "./types";
+import { Dispute, CostModel } from "./types";
 
 //TODO: condense for better and more efficient query and cache
 export const indexerAllocationsQuery = gql`
@@ -217,6 +216,61 @@ export async function fetchPOI(
   } catch {
     console.warn(
       `⚠️ No POI fetched from the local graph-node for subgraph ${subgraph}.`
+        .yellow
+    );
+  }
+}
+
+export const costModels = async (client: Client): Promise<CostModel[]> => {
+  try {
+    const result = await client
+      .query(
+        gql`
+          {
+            costModels {
+              deployment
+              model
+              variables
+            }
+          }
+        `
+      )
+      .toPromise();
+
+    if (result.error) {
+      throw result.error;
+    }
+    return result.data.costModels;
+  } catch (error) {
+    console.warn(`Failed to query costModels`, { error });
+    return [];
+  }
+};
+
+export async function updateCostModel(client: Client, costModel: CostModel) {
+  try {
+    const result = await client
+      .mutation(
+        gql`
+          mutation setCostModel($costModel: CostModelInput!) {
+            setCostModel(costModel: $costModel) {
+              deployment
+              model
+              variables
+            }
+          }
+        `,
+        { costModel }
+      )
+      .toPromise();
+
+    if (result.error) {
+      throw result.error;
+    }
+    return result.data.setCostModel;
+  } catch {
+    console.warn(
+      `Failed to update cost model ${costModel} at indexer management server, skip for now`
         .yellow
     );
   }

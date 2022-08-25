@@ -5,19 +5,17 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import {
-  Attestation,
-  IndexerResponse,
-  IndexerStakeResponse,
-} from "../../radio-common/types";
+import { Attestation } from "../../radio-common/types";
 import {
   fetchAllocations,
   fetchPOI,
+  updateCostModel,
 } from "../../radio-common/queries";
-import { printNPOIs } from "../../utils";
+import { printNPOIs, sortAttestations } from "../../radio-common/utils";
 import RadioFilter from "../../radio-common/customs";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
+import bs58 from "bs58";
 
 const run = async () => {
   const observer = new Observer();
@@ -34,16 +32,17 @@ const run = async () => {
   });
   const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
   const graphClient = createClient({ url: graphNodeEndpoint, fetch });
-  const { provider, goerliProvider, registryContract } = ethClient;
-
+  const { provider } = ethClient;
+  const indexerClient = createClient({
+    url: `http://${process.env.INDEXER_MANAGERMENT_SERVER}`,
+    fetch,
+  });
   const radioFilter = new RadioFilter();
-  // Check self in the registry
-  // const operatorStatus = await ethClient.checkRegistry(process.env.INDEXER_ADDRESS, process.env.RADIO_OPERATOR)
-  const isOperator = await radioFilter.isOperator(
-    registryClient,
-    process.env.INDEXER_ADDRESS,
-    process.env.RADIO_OPERATOR
-  );
+
+  const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
+  const localnPOIs: Map<string, Map<string, string>> = new Map();
+
+  // Initial queries
   const allocations = await fetchAllocations(
     client,
     process.env.INDEXER_ADDRESS
@@ -56,13 +55,13 @@ const run = async () => {
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
     {
-      isOperator,
+      isOperator: await radioFilter.isOperator(
+        registryClient,
+        process.env.RADIO_OPERATOR
+      ),
       topics,
     }
   );
-
-  const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
-  const localnPOIs: Map<string, Map<string, string>> = new Map();
 
   const handler = (msg: Uint8Array) => {
     printNPOIs(nPOIs);
@@ -93,17 +92,18 @@ const run = async () => {
       }
 
       const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
-      console.info(
-        `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
-          .green
-      );
+      if (sender != process.env.RADIO_OPERATOR) {
+        console.info(
+          `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
+            .green
+        );
+      }
 
       // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
       const senderStake = await radioFilter.poiMsgValidity(
         registryClient,
         sender,
-        timestamp,
-        sender
+        timestamp
       );
       if (senderStake <= 0) {
         console.warn(
@@ -118,7 +118,9 @@ const run = async () => {
         indexerAddress: sender,
         stake: BigInt(BigInt(senderStake)),
       };
-      console.debug(`Valid message, caching attestation`, { attestation });
+      console.debug(`Valid message, caching attestation`.green, {
+        attestation,
+      });
       if (nPOIs.has(subgraph)) {
         const blocks = nPOIs.get(subgraph);
         if (blocks.has(blockNumber.toString())) {
@@ -154,10 +156,9 @@ const run = async () => {
       );
 
       if (localPOI == undefined || localPOI == null) {
-        //TODO: SetCostModel for the POI to a ridiculously high price
+        //Q: If the agent doesn't find a ipfshash, it probably makes sense to setCostModel as well
+        // However this handling makes more sense to be in the agent
         unavailableDplymts.push(ipfsHash);
-        //Connect to indexer management server - (can build network subgraph from this by allowing local indexer-service to serve
-        //Construct setCostModel mutation and send to server, check responses
       } else {
         //TODO: normalize POI
         protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
@@ -175,7 +176,7 @@ const run = async () => {
             blockNumber: block,
             subgraph: ipfsHash,
             nPOI: localPOI,
-            sender: process.env.INDEXER_ADDRESS,
+            sender: process.env.RADIO_OPERATOR,
           };
           const encodedMessage = Message.encode(message).finish();
           await messenger.sendMessage(
@@ -210,66 +211,75 @@ const run = async () => {
           localnPOIs,
         });
       }
-
-      localnPOIs.forEach((blocks, subgraph) => {
-        const remoteBlocks = nPOIs.get(subgraph);
+      const divergedDeployment: string[] = [];
+      localnPOIs.forEach((blocks, subgraphDeployment) => {
+        const remoteBlocks = nPOIs.get(subgraphDeployment);
         if (remoteBlocks && remoteBlocks.size >= 0) {
           const attestations = remoteBlocks.get((block - 8).toString());
           if (!attestations) {
             console.log(
-              `No attestations for $(subgraph) on block ${
+              `No attestations for $(subgraphDeployment) on block ${
                 block - 8
               } at the moment`
             );
             return;
           }
 
-          console.log(
-            `📒 Attestations for subgraph ${subgraph} on block ${block - 8}:`
-              .blue,
-            {
-              attestations,
-            }
-          );
-
-          const sorted = attestations.sort((a, b) => {
-            if (a.stake < b.stake) {
-              return 1;
-            } else if (a.stake > b.stake) {
-              return -1;
-            } else {
-              return 0;
-            }
+          const topAttestation = sortAttestations(attestations)[0];
+          const localNPOI = blocks.get((block - 8).toString());
+          console.log(`📒 Attestation check`.blue, {
+            subgraphDeployment,
+            block: block - 8,
+            attestations,
+            mostStaked: topAttestation.nPOI,
+            localNPOI,
           });
 
-          const topAttestation = sorted[0];
-          console.log(
-            `🥇 NPOI backed by the most stake: ${topAttestation.nPOI}`.cyan
-          );
-          const localNPOI = blocks.get((block - 8).toString());
-
           if (topAttestation.nPOI === localNPOI) {
-            console.log(
-              `✅ POIs match for subgraph ${subgraph} on block ${block - 8}.`
-                .green
+            console.debug(
+              `✅ POIs match for subgraphDeployment ${subgraphDeployment} on block ${
+                block - 8
+              }.`.green
             );
           } else {
-            console.log(
-              `❌ POIS do not match for subgraph ${subgraph} on block ${
-                block - 8
-              }. Local POI is ${localNPOI} and remote POI tied to the most stake is ${
-                topAttestation.nPOI
-              }.`.red
+            //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
+            //But I guess they cannot specifically buy as queries go through ISA
+            console.warn(
+              `❌ POIS do not match, updating cost model to block off incoming queries`
+                .red
+            );
+            // Cost model schema used byte32 representation of the deployment hash
+            divergedDeployment.push(
+              Buffer.from(bs58.decode(subgraphDeployment))
+                .toString("hex")
+                .replace("1220", "0x")
             );
           }
         } else {
           console.log(
-            `Could not find entries for subgraph ${subgraph} in remote nPOIs. Continuing...`
+            `Could not find entries for subgraphDeployment ${subgraphDeployment} in remote nPOIs. Continuing...`
               .red
           );
         }
       });
 
+      // Handle POI divergences from the highest stake weight nPOIs
+      const defaultModel = "default => 100000;";
+      console.log(
+        `:Hand: Handle POI divergences by setting a crazy high cost model to avoid query traffic`
+          .red,
+        { divergedDeployment, defaultModel }
+      );
+      //Idea: parallize, move to earlier when first no match, or new query variant in indexer management cost model schema
+      divergedDeployment.map(async (deployment) => {
+        await updateCostModel(indexerClient, {
+          deployment,
+          model: defaultModel,
+          variables: null,
+        });
+      });
+
+      //Q: change cost models dynamically. maybe output divergedDeployment?
       nPOIs.clear();
       localnPOIs.clear();
     }
