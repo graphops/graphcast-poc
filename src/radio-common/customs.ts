@@ -71,12 +71,7 @@ export default class RadioFilter {
     // Check for POI message validity
 
     // Resolve signer to indexer identity via registry
-    const isOperator = await this.isOperator(client, sender);
-    //TODO: skipping for easier ease of testing on other indexers
-    const indexerAddress = await this.isOperatorOf(
-      client,
-      process.env.RADIO_OPERATOR
-    );
+    const indexerAddress = await this.isOperatorOf(client, sender);
 
     // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
     const senderStake = await this.indexerCheck(client, indexerAddress);

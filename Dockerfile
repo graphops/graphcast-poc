@@ -17,6 +17,6 @@ ENV TERM "xterm-256color"
 ENV GOERLI_NODE "<GOERLI_NODE>"
 ENV REGISTRY_SUBGRAPH "https://api.thegraph.com/subgraphs/name/juanmardefago/gossip-network-subgraph"
 ENV INDEXER_MANAGEMENT_SERVER "host.docker.internal:18000"
-ENV RADIO_OPERATOR "<RADIO_OPERATOR>""
+ENV RADIO_OPERATOR "<RADIO_OPERATOR>"
 
 CMD node poi-crosschecker.js
