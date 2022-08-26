@@ -34,7 +34,7 @@ const run = async () => {
   const graphClient = createClient({ url: graphNodeEndpoint, fetch });
   const { provider } = ethClient;
   const indexerClient = createClient({
-    url: `http://${process.env.INDEXER_MANAGERMENT_SERVER}`,
+    url: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
     fetch,
   });
   const radioFilter = new RadioFilter();
@@ -42,11 +42,16 @@ const run = async () => {
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
 
-  // Initial queries
-  const allocations = await fetchAllocations(
-    client,
-    process.env.INDEXER_ADDRESS
+  const indexerAddress = await radioFilter.isOperatorOf(
+    registryClient,
+    process.env.RADIO_OPERATOR
   );
+  console.log(
+    "🔦 Radio operator resolved to indexer address - " + indexerAddress
+  );
+
+  // Initial queries
+  const allocations = await fetchAllocations(client, indexerAddress);
   const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
@@ -98,6 +103,8 @@ const run = async () => {
             .green
         );
       }
+
+      console.log("ℹ️ Sender radio operator address " + sender);
 
       // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
       const senderStake = await radioFilter.poiMsgValidity(
@@ -152,7 +159,7 @@ const run = async () => {
         ipfsHash,
         block,
         blockObject.hash,
-        process.env.INDEXER_ADDRESS
+        indexerAddress
       );
 
       if (localPOI == undefined || localPOI == null) {
@@ -265,11 +272,11 @@ const run = async () => {
 
       // Handle POI divergences from the highest stake weight nPOIs
       const defaultModel = "default => 100000;";
-      console.log(
-        `:Hand: Handle POI divergences by setting a crazy high cost model to avoid query traffic`
-          .red,
-        { divergedDeployment, defaultModel }
-      );
+      // console.log(
+      //   `⚠️ Handle POI divergences by setting a crazy high cost model to avoid query traffic`
+      //     .red,
+      //   { divergedDeployment, defaultModel }
+      // );
       //Idea: parallize, move to earlier when first no match, or new query variant in indexer management cost model schema
       divergedDeployment.map(async (deployment) => {
         await updateCostModel(indexerClient, {

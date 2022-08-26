@@ -1,4 +1,4 @@
-import { Attestation } from "./radio-common/types";
+import { Attestation } from "./types";
 import "colors";
 
 export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {

@@ -6,8 +6,6 @@ import {
   fetchStake,
   fetchOperatorOfIndexers,
 } from "./queries";
-import { formatGRT } from "@graphprotocol/common-ts";
-import { EthClient } from "../ethClient";
 
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
@@ -25,7 +23,8 @@ export default class RadioFilter {
   }
 
   public async isOperatorOf(client: Client, sender: string) {
-    return await fetchOperatorOfIndexers(client, sender);
+    const res = await fetchOperatorOfIndexers(client, sender);
+    return res[0];
   }
 
   public async isOperator(client: Client, sender: string) {
@@ -74,31 +73,24 @@ export default class RadioFilter {
     // Resolve signer to indexer identity via registry
     const isOperator = await this.isOperator(client, sender);
     //TODO: skipping for easier ease of testing on other indexers
-    const indexer = isOperator
-      ? (await this.isOperatorOf(client, sender))[0]
-      : sender;
+    const indexerAddress = await this.isOperatorOf(
+      client,
+      process.env.RADIO_OPERATOR
+    );
 
     // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
-    const senderStake = await this.indexerCheck(client, indexer);
+    const senderStake = await this.indexerCheck(client, indexerAddress);
 
     // Check that sender is not currently in any disputes?
     // Simple: don't trust senders with token slashed history
-    const tokensSlashed = await this.disputeStatusCheck(client, indexer);
+    const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
 
-    console.debug(
-      `Verifying message params, (TODO: Add skip opeartor check after updating the message format)`
-        .grey,
-      {
-        isOperator,
-        indexer,
-        senderStake,
-        tokensSlashed,
-        replyAttack: !this.replyThreshold(timestamp),
-        operatorWarning: !isOperator
-          ? `No match between the graph account of gossip client and supposed indexer address`
-          : null,
-      }
-    );
+    console.debug(`👮 Verifying message params`.grey, {
+      indexerAddress,
+      senderStake,
+      tokensSlashed,
+      replyAttack: !this.replyThreshold(timestamp),
+    });
     // Message reply attack checks on timestamp, assume a 1 hour constant (3600000ms)
     if (
       senderStake == 0 ||

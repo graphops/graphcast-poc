@@ -42,9 +42,6 @@ export const operatorOfIndexerQuery = gql`
       id
       gossipOperatorOf {
         id
-        indexer {
-          id
-        }
       }
     }
   }
@@ -165,9 +162,9 @@ export async function fetchOperatorOfIndexers(client: Client, address: string) {
     if (result.error) {
       throw result.error;
     }
-    return result.data.graphAccount.gossipOperatorOf.map(
-      (account) => account.indexer.id
-    );
+    return result.data.graphAccount.gossipOperatorOf.map((account) => {
+      return account.id;
+    });
   } catch (error) {
     console.warn(
       `Did not find corresponding indexer address for the gossip operator`
