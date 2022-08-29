@@ -33,6 +33,7 @@ const run = async () => {
   const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
   const graphClient = createClient({ url: graphNodeEndpoint, fetch });
   const { provider } = ethClient;
+
   const indexerClient = createClient({
     url: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
     fetch,
@@ -69,6 +70,8 @@ const run = async () => {
   );
 
   const handler = (msg: Uint8Array) => {
+    console.log("Are we getting here???");
+    
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
