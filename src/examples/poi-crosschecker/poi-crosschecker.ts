@@ -17,13 +17,16 @@ import RadioFilter from "../../radio-common/customs";
 const protobuf = require("protobufjs");
 import bs58 from "bs58";
 
+import { generatePrivateKey, getPublicKey , generateSymmetricKey} from "js-waku";
+
+
 const run = async () => {
   const observer = new Observer();
   const messenger = new Messenger();
   const ethClient = new EthClient();
-
-  await observer.init();
-  await messenger.init();
+  const symmetricKey = generateSymmetricKey();
+  await observer.init(ethClient, symmetricKey);
+  await messenger.init(symmetricKey);
 
   const client = createClient({ url: process.env.NETWORK_URL, fetch });
   const registryClient = createClient({
@@ -69,37 +72,11 @@ const run = async () => {
     }
   );
 
-  const handler = (msg: Uint8Array) => {
-    console.log("Are we getting here???");
-    
+  const handler = async (message: any) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
+    const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
 
-    protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-      if (err) {
-        throw err;
-      }
-
-      let message;
-      try {
-        const Message = root.lookupType("gossip.NPOIMessage");
-        const decodedMessage = Message.decode(msg);
-
-        message = Message.toObject(decodedMessage, {
-          timestamp: Number,
-          blockNumber: Number,
-          subgraph: String,
-          nPOI: String,
-          sender: String,
-        });
-      } catch (error) {
-        console.error(
-          `Protobuf reader could not decode message, assume corrupted`
-        );
-        return;
-      }
-
-      const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
       if (sender != process.env.RADIO_OPERATOR) {
         console.info(
           `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
@@ -145,7 +122,7 @@ const run = async () => {
         blocks.set(blockNumber.toString(), [attestation]);
         nPOIs.set(subgraph, blocks);
       }
-    });
+    
   };
 
   observer.observe(topics, handler);
