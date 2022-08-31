@@ -46,8 +46,15 @@ const run = async () => {
     registryClient,
     process.env.RADIO_OPERATOR
   );
+
+  // example to use the wallet methods: get balance, get public key
+  const ethBalance = await ethClient.ethBalance();
   console.log(
-    "🔦 Radio operator resolved to indexer address - " + indexerAddress
+    "🔦 Radio operator resolved to indexer address - " + indexerAddress,
+    {
+      operatorEthBalance: ethBalance,
+      operatorPublic: ethClient.wallet.publicKey,
+    }
   );
 
   // Initial queries
