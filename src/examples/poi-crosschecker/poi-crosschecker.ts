@@ -90,11 +90,13 @@ const run = async () => {
         const decodedMessage = Message.decode(msg);
 
         message = Message.toObject(decodedMessage, {
+          nonce: Number,
           timestamp: Number,
           blockNumber: Number,
+          blockHash: String,
+          sender: String,
           subgraph: String,
           nPOI: String,
-          sender: String,
         });
       } catch (error) {
         console.error(
@@ -103,25 +105,34 @@ const run = async () => {
         return;
       }
 
-      const { timestamp, blockNumber, subgraph, nPOI, sender } = message;
-      if (sender != process.env.RADIO_OPERATOR) {
-        console.info(
-          `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
-            .green
-        );
-      }
-
-      console.log("ℹ️ Sender radio operator address " + sender);
+      const {
+        nonce,
+        timestamp,
+        blockNumber,
+        blockHash,
+        sender,
+        subgraph,
+        nPOI,
+      } = message;
+      // temporarily removed self check for easy testing
+      console.info(
+        `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\nNonce: ${nonce}`
+          .green
+      );
 
       // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const senderStake = await radioFilter.poiMsgValidity(
+      const block = await provider.getBlock(Number(blockNumber))
+      const stake = await radioFilter.poiMsgValidity(
         registryClient,
         sender,
-        timestamp
+        timestamp,
+        Number(nonce),
+        blockHash,
+        block
       );
-      if (senderStake <= 0) {
+      if (stake <= 0) {
         console.warn(
-          `\nMessage considered compromised, intercepting - invalid sender\n`
+          `\nMessage considered compromised, intercepting\n`
             .red
         );
         return;
@@ -130,7 +141,7 @@ const run = async () => {
       const attestation: Attestation = {
         nPOI,
         indexerAddress: sender,
-        stake: BigInt(BigInt(senderStake)),
+        stake: BigInt(stake),
       };
       console.debug(`Valid message, caching attestation`.green, {
         attestation,
@@ -185,12 +196,24 @@ const run = async () => {
           localnPOIs.set(ipfsHash, blocks);
 
           const Message = root.lookupType("gossip.NPOIMessage");
-          const message = {
+          
+          console.log(`send messeage`, {
+            nonce: messenger.nonce,
             timestamp: new Date().getTime(),
-            blockNumber: block,
+            blockNumber: blockObject.number,
+            blockHash: blockObject.hash,
+            sender: process.env.RADIO_OPERATOR,
             subgraph: ipfsHash,
             nPOI: localPOI,
+          })
+          const message = {
+            nonce: messenger.nonce,
+            timestamp: new Date().getTime(),
+            blockNumber: blockObject.number,
+            blockHash: blockObject.hash,
             sender: process.env.RADIO_OPERATOR,
+            subgraph: ipfsHash,
+            nPOI: localPOI,
           };
           const encodedMessage = Message.encode(message).finish();
           await messenger.sendMessage(

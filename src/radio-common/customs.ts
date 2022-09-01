@@ -1,3 +1,4 @@
+import { Block } from "@ethersproject/providers";
 import { Client } from "@urql/core";
 import {
   fetchDisputes,
@@ -10,12 +11,15 @@ import {
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  msgReplayReq: number;
+  msgReplayLimit: number;
   minStakeReq: number;
+  // Map sender identity to <nonce>
+  nonceDirectory: Map<string, number>;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor() {
-    this.msgReplayReq = ONE_HOUR;
+    this.msgReplayLimit = ONE_HOUR;
     this.minStakeReq;
+    this.nonceDirectory = new Map();
   }
 
   public async setRequirement(client: Client) {
@@ -24,7 +28,7 @@ export default class RadioFilter {
 
   public async isOperatorOf(client: Client, sender: string) {
     const res = await fetchOperatorOfIndexers(client, sender);
-    return res[0];
+    return res ? res[0] : "";
   }
 
   public async isOperator(client: Client, sender: string) {
@@ -49,14 +53,29 @@ export default class RadioFilter {
     return Number(senderStake);
   }
 
-  public replyThreshold(timestamp: number) {
+  // Message timestamp from within the past hour and match with block
+  public async replayCheck(timestamp: number, blockHash:string, block: Block) {
     const messageAge = new Date().getTime() - timestamp;
-    return messageAge < this.msgReplayReq;
+    return messageAge <= 0 || messageAge >= this.msgReplayLimit || blockHash !== block.hash ||
+          timestamp < block.timestamp;
+  }
+
+  public inconsistentNonce(
+    sender: string,
+    nonce: number,
+  ) {
+    // Correct block hash and message sent after block
+    // we said to drop the first message and add the nonce for future
+    //TODO: store the state somewhere 
+    const prevNonce:number = (sender in this.nonceDirectory) ? this.nonceDirectory[sender] : (this.nonceDirectory[sender] = nonce, Number.NEGATIVE_INFINITY);
+    console.log(`prev`, {prevNonce, nonce, inconsistent: prevNonce +1 !== nonce})
+    // can be more lean and allow a greater nonce
+    return prevNonce +1 !== nonce;
   }
 
   public async disputeStatusCheck(client: Client, address: string) {
     const senderDisputes = await fetchDisputes(client, address);
-    //Note: Disputes could be weighted by status and type, currently taking sum of indexer's token slashed
+    //Note: a more relaxed check is if there's dispute with Undecided status
     return senderDisputes.reduce(
       (slashedRecord, dispute) => slashedRecord + Number(dispute.tokensSlashed),
       0
@@ -66,34 +85,46 @@ export default class RadioFilter {
   public async poiMsgValidity(
     client: Client,
     sender: string,
-    timestamp: number
+    timestamp: number,
+    nonce: number,
+    blockHash: string,
+    block: Block
   ) {
-    // Check for POI message validity
-
-    // Resolve signer to indexer identity via registry
+    // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(client, sender);
-
-    // Call the radio SDK for indexer identity check, set to 0 if did not meet the check
-    const senderStake = await this.indexerCheck(client, indexerAddress);
-
-    // Check that sender is not currently in any disputes?
-    // Simple: don't trust senders with token slashed history
-    const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
-
-    console.debug(`👮 Verifying message params`.grey, {
-      indexerAddress,
-      senderStake,
-      tokensSlashed,
-      replyAttack: !this.replyThreshold(timestamp),
-    });
-    // Message reply attack checks on timestamp, assume a 1 hour constant (3600000ms)
-    if (
-      senderStake == 0 ||
-      !this.replyThreshold(timestamp) ||
-      tokensSlashed > 0
-    ) {
+    if (!indexerAddress) {
+      console.warn(`👮 Sender not an operator, drop message`);
       return 0;
     }
-    return senderStake - tokensSlashed;
+    const senderStake = await this.indexerCheck(client, indexerAddress);
+    const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
+    if (senderStake == 0 || tokensSlashed > 0) {
+      console.warn(
+        `👮 Indexer identity failed stake requirement or has been slashed, drop message`
+      );
+      return 0;
+    }
+
+    // Message param checks
+    if (await this.replayCheck(timestamp, blockHash, block)){
+      console.warn(
+        `👮 Invalid timestamps, drop message`, {
+          timestamp,
+          blockHash,
+          queriedBlock: block.hash,
+        }
+      );
+      return 0
+    } 
+    if (this.inconsistentNonce(
+      sender,
+      nonce,
+    )){
+      console.warn(
+        `👮 Invalid nonce from sender, drop message`
+      );
+      return 0;
+    }
+    return senderStake
   }
 }
