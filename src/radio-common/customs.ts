@@ -67,9 +67,12 @@ export default class RadioFilter {
     // Correct block hash and message sent after block
     // we said to drop the first message and add the nonce for future
     //TODO: store the state somewhere 
-    const prevNonce:number = (sender in this.nonceDirectory) ? this.nonceDirectory[sender] : (this.nonceDirectory[sender] = nonce, Number.NEGATIVE_INFINITY);
+    const prevNonce:number = (sender in this.nonceDirectory) ? this.nonceDirectory[sender] : Number.NEGATIVE_INFINITY;
+    // always update nonce if it is a higher number, in case we missed a message
+    this.nonceDirectory[sender] = Math.max(prevNonce, nonce)
     console.log(`prev`, {prevNonce, nonce, inconsistent: prevNonce +1 !== nonce})
     // can be more lean and allow a greater nonce
+    // ->Since we allow fast forward, let this check be strict with 1
     return prevNonce +1 !== nonce;
   }
 
