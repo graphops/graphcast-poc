@@ -9,4 +9,5 @@ message NPOIMessage {
     string sender = 5;
     string subgraph = 6;
     string nPOI = 7;
+    string signature = 8;
 }
