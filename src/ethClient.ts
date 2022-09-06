@@ -11,7 +11,7 @@ export class EthClient {
     );
     this.provider = provider;
 
-    const wallet = new Wallet(process.env.RADIO_OPERATOR_PRIVATE_KEY, provider);
+    const wallet = new Wallet(process.env.RADIO_OPERATOR_PRIVATE_KEY);
     this.wallet = wallet.connect(provider);
   }
 

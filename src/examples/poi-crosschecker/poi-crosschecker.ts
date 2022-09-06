@@ -6,6 +6,7 @@ import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
 import { Attestation } from "../../radio-common/types";
+import { fromString } from "uint8arrays/from-string";
 import {
   fetchAllocations,
   fetchPOI,
@@ -14,6 +15,8 @@ import {
 import { printNPOIs, sortAttestations } from "../../radio-common/utils";
 import RadioFilter from "../../radio-common/customs";
 import bs58 from "bs58";
+// TODO: Move to ethClient
+import { ethers } from "ethers";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
@@ -26,7 +29,6 @@ const run = async () => {
   await observer.init();
   await messenger.init();
 
-  //const publicKey = ethClient.getPublicKey();
   const operatorAddress = ethClient.getAddress().toLowerCase();
 
   const client = createClient({ url: process.env.NETWORK_URL, fetch });
@@ -97,6 +99,7 @@ const run = async () => {
           sender: String,
           subgraph: String,
           nPOI: String,
+          signature: String,
         });
       } catch (error) {
         console.error(
@@ -113,15 +116,48 @@ const run = async () => {
         sender,
         subgraph,
         nPOI,
+        signature,
       } = message;
+
       // temporarily removed self check for easy testing
       console.info(
         `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\nNonce: ${nonce}`
           .green
       );
 
+      console.log("✍️ Signature of sender - " + signature);
+      console.log("🔎 Validating signature...");
+
+      // Move to ethClient
+      const address = ethers.utils
+        .verifyMessage(
+          fromString(
+            JSON.stringify({
+              nonce: parseInt(nonce ).toString(),
+              timestamp: parseInt(timestamp).toString(),
+              blockNumber: parseInt(blockNumber).toString(),
+              blockHash,
+              subgraph,
+              nPOI,
+              sender,
+            })
+          ),
+          signature
+        )
+        .toLocaleLowerCase();
+
+      if (address !== sender) {
+        console.error(
+          `Signature is invalid! Sender address '${sender}' is different from generated signator address '${address}'.`
+            .red
+        );
+        return;
+      }
+
+      console.log("✅ Signature is valid!");
+
       // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const block = await provider.getBlock(Number(blockNumber))
+      const block = await provider.getBlock(Number(blockNumber));
       const stake = await radioFilter.poiMsgValidity(
         registryClient,
         sender,
@@ -131,10 +167,7 @@ const run = async () => {
         block
       );
       if (stake <= 0) {
-        console.warn(
-          `\nMessage considered compromised, intercepting\n`
-            .red
-        );
+        console.warn(`\nMessage considered compromised, intercepting\n`.red);
         return;
       }
 
@@ -196,24 +229,26 @@ const run = async () => {
           localnPOIs.set(ipfsHash, blocks);
 
           const Message = root.lookupType("gossip.NPOIMessage");
-          
-          console.log(`send messeage`, {
-            nonce: messenger.nonce,
-            timestamp: new Date().getTime(),
-            blockNumber: blockObject.number,
-            blockHash: blockObject.hash,
-            sender: process.env.RADIO_OPERATOR,
-            subgraph: ipfsHash,
-            nPOI: localPOI,
-          })
-          const message = {
-            nonce: messenger.nonce,
-            timestamp: new Date().getTime(),
-            blockNumber: blockObject.number,
+          const rawMessage = {
+            nonce: messenger.nonce.toString(),
+            timestamp: new Date().getTime().toString(),
+            blockNumber: blockObject.number.toString(),
             blockHash: blockObject.hash,
             subgraph: ipfsHash,
             nPOI: localPOI,
           };
+
+          const signature = await ethClient.wallet.signMessage(
+            fromString(JSON.stringify(rawMessage))
+          );
+
+          const message = {
+            ...rawMessage,
+            signature,
+          };
+
+          console.log("✍️ Signing... " + signature);
+
           const encodedMessage = Message.encode(message).finish();
           await messenger.sendMessage(
             encodedMessage,
