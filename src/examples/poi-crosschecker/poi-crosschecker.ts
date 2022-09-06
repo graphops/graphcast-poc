@@ -13,9 +13,10 @@ import {
 } from "../../radio-common/queries";
 import { printNPOIs, sortAttestations } from "../../radio-common/utils";
 import RadioFilter from "../../radio-common/customs";
+import bs58 from "bs58";
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
-import bs58 from "bs58";
 
 const run = async () => {
   const observer = new Observer();
@@ -24,6 +25,9 @@ const run = async () => {
 
   await observer.init();
   await messenger.init();
+
+  //const publicKey = ethClient.getPublicKey();
+  const operatorAddress = ethClient.getAddress().toLowerCase();
 
   const client = createClient({ url: process.env.NETWORK_URL, fetch });
   const registryClient = createClient({
@@ -42,18 +46,17 @@ const run = async () => {
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
 
+  const ethBalance = await ethClient.getEthBalance();
   const indexerAddress = await radioFilter.isOperatorOf(
     registryClient,
-    process.env.RADIO_OPERATOR
+    operatorAddress
   );
 
-  // example to use the wallet methods: get balance, get public key
-  const ethBalance = await ethClient.ethBalance();
   console.log(
     "🔦 Radio operator resolved to indexer address - " + indexerAddress,
     {
       operatorEthBalance: ethBalance,
-      operatorPublic: ethClient.wallet.publicKey,
+      operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
 
@@ -67,10 +70,7 @@ const run = async () => {
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
     {
-      isOperator: await radioFilter.isOperator(
-        registryClient,
-        process.env.RADIO_OPERATOR
-      ),
+      isOperator: await radioFilter.isOperator(registryClient, operatorAddress),
       topics,
     }
   );
