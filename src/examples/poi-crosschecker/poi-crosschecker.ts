@@ -211,7 +211,6 @@ const run = async () => {
             timestamp: new Date().getTime(),
             blockNumber: blockObject.number,
             blockHash: blockObject.hash,
-            sender: process.env.RADIO_OPERATOR,
             subgraph: ipfsHash,
             nPOI: localPOI,
           };
