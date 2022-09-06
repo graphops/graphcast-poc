@@ -2,9 +2,11 @@ syntax = "proto3";
 package gossip;
 
 message NPOIMessage {
-    int64 timestamp = 1;
-    int64 blockNumber = 2;
-    string subgraph = 3;
-    string nPOI = 4;
-    string sender = 5; 
+    int64 nonce = 1;
+    int64 timestamp = 2;
+    int64 blockNumber = 3;
+    string blockHash = 4; 
+    string sender = 5;
+    string subgraph = 6;
+    string nPOI = 7;
 }
