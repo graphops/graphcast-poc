@@ -24,11 +24,6 @@ export class EthClient {
     return parseFloat(utils.formatEther(balance));
   }
 
-  getPublicKey(): string {
-    const publicKey = this.wallet.publicKey;
-    return publicKey;
-  }
-
   getAddress(): string {
     const publicKey = this.wallet.address;
     return publicKey;
