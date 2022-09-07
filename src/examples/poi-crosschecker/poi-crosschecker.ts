@@ -128,23 +128,31 @@ const run = async () => {
       console.log("✍️ Signature of sender - " + signature);
       console.log("🔎 Validating signature...");
 
-      // Move to ethClient
+      const domain = {
+        name: `graphcast-poi-crosschecker`,
+        version: "0",
+      };
+
+      const types = {
+        PublishEncryptionPublicKey: [{ name: "messageJson", type: "string" }],
+      };
+
+      const value = {
+        messageJson: JSON.stringify({
+          nonce: parseInt(nonce),
+          timestamp: parseInt(timestamp),
+          blockNumber: parseInt(blockNumber),
+          blockHash,
+          subgraph,
+          nPOI,
+          sender,
+        }),
+      };
+
+      const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
       const address = ethers.utils
-        .verifyMessage(
-          fromString(
-            JSON.stringify({
-              nonce: parseInt(nonce ).toString(),
-              timestamp: parseInt(timestamp).toString(),
-              blockNumber: parseInt(blockNumber).toString(),
-              blockHash,
-              subgraph,
-              nPOI,
-              sender,
-            })
-          ),
-          signature
-        )
-        .toLocaleLowerCase();
+        .recoverAddress(hash, signature)
+        .toLowerCase();
 
       if (address !== sender) {
         console.error(
@@ -230,16 +238,34 @@ const run = async () => {
 
           const Message = root.lookupType("gossip.NPOIMessage");
           const rawMessage = {
-            nonce: messenger.nonce.toString(),
-            timestamp: new Date().getTime().toString(),
-            blockNumber: blockObject.number.toString(),
+            nonce: messenger.nonce,
+            timestamp: new Date().getTime(),
+            blockNumber: blockObject.number,
             blockHash: blockObject.hash,
             subgraph: ipfsHash,
             nPOI: localPOI,
           };
 
-          const signature = await ethClient.wallet.signMessage(
-            fromString(JSON.stringify(rawMessage))
+          // Maybe add salt?
+          const domain = {
+            name: `graphcast-poi-crosschecker`,
+            version: "0",
+          };
+
+          const types = {
+            PublishEncryptionPublicKey: [
+              { name: "messageJson", type: "string" },
+            ],
+          };
+
+          const value = {
+            messageJson: JSON.stringify(rawMessage),
+          };
+
+          const signature = await ethClient.wallet._signTypedData(
+            domain,
+            types,
+            value
           );
 
           const message = {
