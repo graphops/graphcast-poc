@@ -133,8 +133,9 @@ const run = async () => {
         version: "0",
       };
 
+      // TODO: Instead of using JSON, we should specify all the types separately
       const types = {
-        PublishEncryptionPublicKey: [{ name: "messageJson", type: "string" }],
+        NPOIMessage: [{ name: "messageJson", type: "string" }],
       };
 
       const value = {
@@ -252,8 +253,9 @@ const run = async () => {
             version: "0",
           };
 
+          // TODO: Instead of using JSON, we should specify all the types separately
           const types = {
-            PublishEncryptionPublicKey: [
+            NPOIMessage: [
               { name: "messageJson", type: "string" },
             ],
           };
