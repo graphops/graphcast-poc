@@ -6,6 +6,7 @@ import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
 import { Attestation } from "../../radio-common/types";
+import { fromString } from "uint8arrays/from-string";
 import {
   fetchAllocations,
   fetchPOI,
@@ -13,9 +14,12 @@ import {
 } from "../../radio-common/queries";
 import { printNPOIs, sortAttestations } from "../../radio-common/utils";
 import RadioFilter from "../../radio-common/customs";
+import bs58 from "bs58";
+// TODO: Move to ethClient
+import { ethers } from "ethers";
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
-import bs58 from "bs58";
 
 const run = async () => {
   const observer = new Observer();
@@ -24,6 +28,8 @@ const run = async () => {
 
   await observer.init();
   await messenger.init();
+
+  const operatorAddress = ethClient.getAddress().toLowerCase();
 
   const client = createClient({ url: process.env.NETWORK_URL, fetch });
   const registryClient = createClient({
@@ -42,18 +48,17 @@ const run = async () => {
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
 
+  const ethBalance = await ethClient.getEthBalance();
   const indexerAddress = await radioFilter.isOperatorOf(
     registryClient,
-    process.env.RADIO_OPERATOR
+    operatorAddress
   );
 
-  // example to use the wallet methods: get balance, get public key
-  const ethBalance = await ethClient.ethBalance();
   console.log(
     "🔦 Radio operator resolved to indexer address - " + indexerAddress,
     {
       operatorEthBalance: ethBalance,
-      operatorPublic: ethClient.wallet.publicKey,
+      operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
 
@@ -67,10 +72,7 @@ const run = async () => {
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
     {
-      isOperator: await radioFilter.isOperator(
-        registryClient,
-        process.env.RADIO_OPERATOR
-      ),
+      isOperator: await radioFilter.isOperator(registryClient, operatorAddress),
       topics,
     }
   );
@@ -97,6 +99,7 @@ const run = async () => {
           sender: String,
           subgraph: String,
           nPOI: String,
+          signature: String,
         });
       } catch (error) {
         console.error(
@@ -113,15 +116,57 @@ const run = async () => {
         sender,
         subgraph,
         nPOI,
+        signature,
       } = message;
+
       // temporarily removed self check for easy testing
       console.info(
         `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\nNonce: ${nonce}`
           .green
       );
 
+      console.log("✍️ Signature of sender - " + signature);
+      console.log("🔎 Validating signature...");
+
+      const domain = {
+        name: `graphcast-poi-crosschecker`,
+        version: "0",
+      };
+
+      // TODO: Instead of using JSON, we should specify all the types separately
+      const types = {
+        NPOIMessage: [{ name: "messageJson", type: "string" }],
+      };
+
+      const value = {
+        messageJson: JSON.stringify({
+          nonce: parseInt(nonce),
+          timestamp: parseInt(timestamp),
+          blockNumber: parseInt(blockNumber),
+          blockHash,
+          subgraph,
+          nPOI,
+          sender,
+        }),
+      };
+
+      const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
+      const address = ethers.utils
+        .recoverAddress(hash, signature)
+        .toLowerCase();
+
+      if (address !== sender) {
+        console.error(
+          `Signature is invalid! Sender address '${sender}' is different from generated signator address '${address}'.`
+            .red
+        );
+        return;
+      }
+
+      console.log("✅ Signature is valid!");
+
       // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const block = await provider.getBlock(Number(blockNumber))
+      const block = await provider.getBlock(Number(blockNumber));
       const stake = await radioFilter.poiMsgValidity(
         registryClient,
         sender,
@@ -131,10 +176,7 @@ const run = async () => {
         block
       );
       if (stake <= 0) {
-        console.warn(
-          `\nMessage considered compromised, intercepting\n`
-            .red
-        );
+        console.warn(`\nMessage considered compromised, intercepting\n`.red);
         return;
       }
 
@@ -196,25 +238,46 @@ const run = async () => {
           localnPOIs.set(ipfsHash, blocks);
 
           const Message = root.lookupType("gossip.NPOIMessage");
-          
-          console.log(`send messeage`, {
+          const rawMessage = {
             nonce: messenger.nonce,
             timestamp: new Date().getTime(),
             blockNumber: blockObject.number,
             blockHash: blockObject.hash,
-            sender: process.env.RADIO_OPERATOR,
             subgraph: ipfsHash,
             nPOI: localPOI,
-          })
-          const message = {
-            nonce: messenger.nonce,
-            timestamp: new Date().getTime(),
-            blockNumber: blockObject.number,
-            blockHash: blockObject.hash,
-            sender: process.env.RADIO_OPERATOR,
-            subgraph: ipfsHash,
-            nPOI: localPOI,
+            sender: operatorAddress,
           };
+
+          // Maybe add salt?
+          const domain = {
+            name: `graphcast-poi-crosschecker`,
+            version: "0",
+          };
+
+          // TODO: Instead of using JSON, we should specify all the types separately
+          const types = {
+            NPOIMessage: [
+              { name: "messageJson", type: "string" },
+            ],
+          };
+
+          const value = {
+            messageJson: JSON.stringify(rawMessage),
+          };
+
+          const signature = await ethClient.wallet._signTypedData(
+            domain,
+            types,
+            value
+          );
+
+          const message = {
+            ...rawMessage,
+            signature,
+          };
+
+          console.log("✍️ Signing... " + signature);
+
           const encodedMessage = Message.encode(message).finish();
           await messenger.sendMessage(
             encodedMessage,

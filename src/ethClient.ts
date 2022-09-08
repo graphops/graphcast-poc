@@ -11,7 +11,7 @@ export class EthClient {
     );
     this.provider = provider;
 
-    const wallet = Wallet.fromMnemonic(process.env.RADIO_OPERATOR_MNEMONIC);
+    const wallet = new Wallet(process.env.RADIO_OPERATOR_PRIVATE_KEY);
     this.wallet = wallet.connect(provider);
   }
 
@@ -19,8 +19,13 @@ export class EthClient {
     return await this.provider.getBlockNumber();
   }
 
-  async ethBalance(): Promise<number> {
+  async getEthBalance(): Promise<number> {
     const balance = await this.wallet.getBalance();
     return parseFloat(utils.formatEther(balance));
+  }
+
+  getAddress(): string {
+    const publicKey = this.wallet.address;
+    return publicKey;
   }
 }
