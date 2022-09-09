@@ -3,11 +3,10 @@ package gossip;
 
 message NPOIMessage {
     int64 nonce = 1;
-    int64 timestamp = 2;
-    int64 blockNumber = 3;
-    string blockHash = 4; 
-    string sender = 5;
-    string subgraph = 6;
-    string nPOI = 7;
-    string signature = 8;
+    int64 blockNumber = 2;
+    string blockHash = 3; 
+    string sender = 4;
+    string subgraph = 5;
+    string nPOI = 6;
+    string signature = 7;
 }
