@@ -13,8 +13,8 @@ export default class RadioFilter {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   msgReplayLimit: number;
   minStakeReq: number;
-  // Map sender identity to <nonce>
-  nonceDirectory: Map<string, number>;
+  // Map sender identity to <topic -> nonce>    //TODO: store between sessions
+  nonceDirectory: Map<string, Map<string, number>>;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor() {
     this.msgReplayLimit = ONE_HOUR;
@@ -62,18 +62,23 @@ export default class RadioFilter {
 
   public inconsistentNonce(
     sender: string,
+    deployment: string,
     nonce: number,
   ) {
     // Correct block hash and message sent after block
     // we said to drop the first message and add the nonce for future
-    //TODO: store the state somewhere 
-    const prevNonce:number = (sender in this.nonceDirectory) ? this.nonceDirectory[sender] : Number.NEGATIVE_INFINITY;
-    // always update nonce if it is a higher number, in case we missed a message
-    this.nonceDirectory[sender] = Math.max(prevNonce, nonce)
-    console.log(`prev`, {prevNonce, nonce, inconsistent: prevNonce +1 !== nonce})
-    // can be more lean and allow a greater nonce
-    // ->Since we allow fast forward, let this check be strict with 1
-    return prevNonce +1 !== nonce;
+    if (!(sender in this.nonceDirectory)){
+      this.nonceDirectory[sender] = { deployment : nonce }
+      return true
+    } else if (!(deployment in this.nonceDirectory[sender])){
+      this.nonceDirectory[sender][deployment] = nonce
+      return true
+    }
+ 
+    const prevNonce:number = this.nonceDirectory[sender][deployment]
+    
+    console.log(`nonce comparison`, {prevNonce, nonce, inconsistent: prevNonce >= nonce})
+    return prevNonce >= nonce;
   }
 
   public async disputeStatusCheck(client: Client, address: string) {
@@ -88,7 +93,7 @@ export default class RadioFilter {
   public async poiMsgValidity(
     client: Client,
     sender: string,
-    timestamp: number,
+    deployment: string,
     nonce: number,
     blockHash: string,
     block: Block
@@ -96,23 +101,27 @@ export default class RadioFilter {
     // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(client, sender);
     if (!indexerAddress) {
-      console.warn(`👮 Sender not an operator, drop message`);
+      console.warn(`👮 Sender not an operator, drop message`.red, {sender});
       return 0;
     }
+
     const senderStake = await this.indexerCheck(client, indexerAddress);
     const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
     if (senderStake == 0 || tokensSlashed > 0) {
       console.warn(
-        `👮 Indexer identity failed stake requirement or has been slashed, drop message`
+        `👮 Indexer identity failed stake requirement or has been slashed, drop message`.red, {
+          senderStake,
+          tokensSlashed
+        }
       );
       return 0;
     }
 
     // Message param checks
-    if (await this.replayCheck(timestamp, blockHash, block)){
+    if (await this.replayCheck(nonce, blockHash, block)){
       console.warn(
-        `👮 Invalid timestamps, drop message`, {
-          timestamp,
+        `👮 Invalid timestamp (nonce), drop message`.red, {
+          nonce,
           blockHash,
           queriedBlock: block.hash,
         }
@@ -121,10 +130,15 @@ export default class RadioFilter {
     } 
     if (this.inconsistentNonce(
       sender,
+      deployment,
       nonce,
     )){
       console.warn(
-        `👮 Invalid nonce from sender, drop message`
+        `👮 Inconsistent nonce or first time sender, drop message`.red, {
+          sender,
+          deployment,
+          nonce
+        }
       );
       return 0;
     }
