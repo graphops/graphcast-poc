@@ -5,18 +5,14 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
-import { Attestation } from "../../radio-common/types";
-import { fromString } from "uint8arrays/from-string";
 import {
   fetchAllocations,
   fetchPOI,
   updateCostModel,
 } from "../../radio-common/queries";
-import { printNPOIs, sortAttestations } from "../../radio-common/utils";
 import RadioFilter from "../../radio-common/customs";
-import bs58 from "bs58";
-// TODO: Move to ethClient
-import { ethers } from "ethers";
+import { Attestation, defaultModel, domain, printNPOIs, processAttestations, storeAttestations, types } from "./poi-helpers";
+import pMap from "p-map";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
@@ -61,6 +57,13 @@ const run = async () => {
       operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
+  let Message;
+  protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+    if (err) {
+      throw err;
+    }
+    Message = root.lookupType("gossip.NPOIMessage");    
+  });
 
   // Initial queries
   const allocations = await fetchAllocations(client, indexerAddress);
@@ -68,6 +71,10 @@ const run = async () => {
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
+  const poiMessageValues = (subgraph:string, nPOI:string) => {return {
+    subgraph,
+    nPOI,
+  }}
   console.log(
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
@@ -77,139 +84,32 @@ const run = async () => {
     }
   );
 
-  const handler = (msg: Uint8Array) => {
+  const poi_handler = async (msg: Uint8Array) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
-    protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-      if (err) {
-        throw err;
-      }
-
-      let message;
-      try {
-        const Message = root.lookupType("gossip.NPOIMessage");
-        const decodedMessage = Message.decode(msg);
-
-        message = Message.toObject(decodedMessage, {
-          nonce: Number,
-          blockNumber: Number,
-          blockHash: String,
-          sender: String,
-          subgraph: String,
-          nPOI: String,
-          signature: String,
-        });
-      } catch (error) {
-        console.error(
-          `Protobuf reader could not decode message, assume corrupted`
-        );
-        return;
-      }
-
-      const {
-        nonce,
-        blockNumber,
-        blockHash,
-        sender,
-        subgraph,
-        nPOI,
-        signature,
-      } = message;
-
+    try{
       // temporarily removed self check for easy testing
       console.info(
-        `\n📮 A new message has been received!\nNonce(timestamp in ms): ${nonce}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
+        `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-
-      console.log("✍️ Signature of sender - " + signature);
-      console.log("🔎 Validating signature...");
-
-      const domain = {
-        name: `graphcast-poi-crosschecker`,
-        version: "0",
-      };
-
-      // TODO: Instead of using JSON, we should specify all the types separately
-      const types = {
-        NPOIMessage: [{ name: "messageJson", type: "string" }],
-      };
-
-      const value = {
-        messageJson: JSON.stringify({
-          nonce: parseInt(nonce),
-          blockNumber: parseInt(blockNumber),
-          blockHash,
-          subgraph,
-          nPOI,
-          sender,
-        }),
-      };
-
-      const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
-      const address = ethers.utils
-        .recoverAddress(hash, signature)
-        .toLowerCase();
-
-      if (address !== sender) {
-        console.error(
-          `Signature is invalid! Sender address '${sender}' is different from generated signator address '${address}'.`
-            .red
-        );
-        return;
-      }
-
-      console.log("✅ Signature is valid!");
-
-      // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const block = await provider.getBlock(Number(blockNumber));
-      const stake = await radioFilter.poiMsgValidity(
-        registryClient,
-        sender,
-        subgraph,
-        Number(nonce),
-        blockHash,
-        block
-      );
-      if (stake <= 0) {
-        return;
-      }
-
-      const attestation: Attestation = {
-        nPOI,
-        indexerAddress: sender,
-        stake: BigInt(stake),
-      };
-      console.debug(`Valid message, caching attestation`.green, {
-        attestation,
-      });
-      if (nPOIs.has(subgraph)) {
-        const blocks = nPOIs.get(subgraph);
-        if (blocks.has(blockNumber.toString())) {
-          const attestations = [...blocks.get(blockNumber.toString())];
-          attestations.push(attestation);
-          blocks.set(blockNumber.toString(), attestations);
-        } else {
-          blocks.set(blockNumber.toString(), [attestation]);
-        }
-      } else {
-        const blocks = new Map();
-        blocks.set(blockNumber.toString(), [attestation]);
-        nPOIs.set(subgraph, blocks);
-      }
-    });
+      const attestation:Attestation = await observer.prepareAttestation(Message, msg, domain, types, poiMessageValues, provider, radioFilter, registryClient)
+      storeAttestations(nPOIs, attestation)
+      return nPOIs
+    } catch {
+      console.error(`Failed to handle a message into attestments, moving on`)
+    }
   };
 
-  observer.observe(topics, handler);
+  observer.observe(topics, poi_handler);
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
     const blockObject = await provider.getBlock(block);
     const unavailableDplymts = [];
-    //TODO: parallelize?
-    for (let i = 0; i < DeploymentIpfses.length; i++) {
-      const ipfsHash = DeploymentIpfses[i];
+    
+    await pMap(DeploymentIpfses, (async ipfsHash => {
       const localPOI = await fetchPOI(
         graphClient,
         ipfsHash,
@@ -218,69 +118,30 @@ const run = async () => {
         indexerAddress
       );
 
-      if (localPOI == undefined || localPOI == null) {
+      if (!localPOI) {
         //Q: If the agent doesn't find a ipfshash, it probably makes sense to setCostModel as well
         // However this handling makes more sense to be in the agent
         unavailableDplymts.push(ipfsHash);
-      } else {
-        //TODO: normalize POI
-        protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-          if (err) {
-            throw err;
-          }
+        return
+      }      
+      const blocks = localnPOIs.get(ipfsHash) ?? new Map();
+      blocks.set(block.toString(), localPOI);
+      localnPOIs.set(ipfsHash, blocks);
 
-          const blocks = localnPOIs.get(ipfsHash) ?? new Map();
-          blocks.set(block.toString(), localPOI);
-          localnPOIs.set(ipfsHash, blocks);
+      const rawMessage = {
+        subgraph: ipfsHash,
+        nPOI: localPOI,
+      };
 
-          const Message = root.lookupType("gossip.NPOIMessage");
-          const rawMessage = {
-            nonce: Date.now(),
-            blockNumber: blockObject.number,
-            blockHash: blockObject.hash,
-            subgraph: ipfsHash,
-            nPOI: localPOI,
-            sender: operatorAddress,
-          };
+      const encodedMessage = await messenger.writeMessage(ethClient, Message, rawMessage, domain, types, blockObject)
 
-          // Maybe add salt?
-          const domain = {
-            name: `graphcast-poi-crosschecker`,
-            version: "0",
-          };
+      console.log(`:outbox_tray: Wrote and encoded message, sending`.green)
+      await messenger.sendMessage(
+        encodedMessage,
+        `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
+      );
+    }), {concurrency: 2})
 
-          // TODO: Instead of using JSON, we should specify all the types separately
-          const types = {
-            NPOIMessage: [
-              { name: "messageJson", type: "string" },
-            ],
-          };
-
-          const value = {
-            messageJson: JSON.stringify(rawMessage),
-          };
-
-          const signature = await ethClient.wallet._signTypedData(
-            domain,
-            types,
-            value
-          );
-
-          const message = {
-            ...rawMessage,
-            signature,
-          };
-
-          console.log("✍️ Signing... " + signature);
-
-          const encodedMessage = Message.encode(message).finish();
-          await messenger.sendMessage(
-            encodedMessage,
-            `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
-          );
-        });
-      }
-    }
     if (unavailableDplymts.length > 0) {
       console.log(
         `😔 Could not get nPOI for following subgraphs at block ${block}. Please check if your node has fully synced the subgraphs below:`
@@ -306,73 +167,22 @@ const run = async () => {
           localnPOIs,
         });
       }
-      const divergedDeployment: string[] = [];
-      localnPOIs.forEach((blocks, subgraphDeployment) => {
-        const remoteBlocks = nPOIs.get(subgraphDeployment);
-        if (remoteBlocks && remoteBlocks.size >= 0) {
-          const attestations = remoteBlocks.get((block - 8).toString());
-          if (!attestations) {
-            console.log(
-              `No attestations for $(subgraphDeployment) on block ${
-                block - 8
-              } at the moment`
-            );
-            return;
-          }
 
-          const topAttestation = sortAttestations(attestations)[0];
-          const localNPOI = blocks.get((block - 8).toString());
-          console.log(`📒 Attestation check`.blue, {
-            subgraphDeployment,
-            block: block - 8,
-            attestations,
-            mostStaked: topAttestation.nPOI,
-            localNPOI,
-          });
-
-          if (topAttestation.nPOI === localNPOI) {
-            console.debug(
-              `✅ POIs match for subgraphDeployment ${subgraphDeployment} on block ${
-                block - 8
-              }.`.green
-            );
-          } else {
-            //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
-            //But I guess they cannot specifically buy as queries go through ISA
-            console.warn(
-              `❌ POIS do not match, updating cost model to block off incoming queries`
-                .red
-            );
-            // Cost model schema used byte32 representation of the deployment hash
-            divergedDeployment.push(
-              Buffer.from(bs58.decode(subgraphDeployment))
-                .toString("hex")
-                .replace("1220", "0x")
-            );
-          }
-        } else {
-          console.log(
-            `Could not find entries for subgraphDeployment ${subgraphDeployment} in remote nPOIs. Continuing...`
-              .red
-          );
-        }
-      });
-
-      // Handle POI divergences from the highest stake weight nPOIs
-      const defaultModel = "default => 100000;";
-      // console.log(
-      //   `⚠️ Handle POI divergences by setting a crazy high cost model to avoid query traffic`
-      //     .red,
-      //   { divergedDeployment, defaultModel }
-      // );
-      //Idea: parallize, move to earlier when first no match, or new query variant in indexer management cost model schema
-      divergedDeployment.map(async (deployment) => {
-        await updateCostModel(indexerClient, {
-          deployment,
-          model: defaultModel,
-          variables: null,
-        });
-      });
+      const divergedDeployments = processAttestations(localnPOIs, nPOIs, (block - 8).toString())
+      if (divergedDeployments){
+        console.log(
+          `⚠️ Handle POI divergences to avoid query traffic`
+            .red,
+          { divergedDeployments, defaultModel }
+        );
+        divergedDeployments.map(deployment => 
+          //TODO: add response handling
+          updateCostModel(indexerClient, {
+            deployment,
+            model: defaultModel,
+            variables: null,
+          }));
+      }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
       nPOIs.clear();

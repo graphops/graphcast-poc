@@ -1,3 +1,4 @@
+import { EthClient } from './ethClient';
 import { Waku, WakuMessage } from "js-waku";
 
 export class Messenger {
@@ -12,6 +13,26 @@ export class Messenger {
 
     // await waku.waitForRemotePeer();
     this.wakuInstance = waku;
+  }
+
+  async writeMessage(client, Message, rawMessage, domain, types, block){
+    const signature = await client.wallet._signTypedData(
+      domain,
+      types,
+      rawMessage
+    );
+
+    const message = {
+      ...rawMessage,
+      nonce: Date.now(),
+      blockNumber: block.number,
+      blockHash: block.hash,
+      signature,
+    };
+    console.log("✍️ Signing... " + signature);
+
+    const encodedMessage = Message.encode(message).finish();
+    return encodedMessage
   }
 
   async sendMessage(encodedMessage: Uint8Array, topic: string) {
