@@ -12,7 +12,6 @@ import {
 } from "../../radio-common/queries";
 import RadioFilter from "../../radio-common/customs";
 import { Attestation, defaultModel, domain, printNPOIs, processAttestations, storeAttestations, types } from "./poi-helpers";
-import pMap from "p-map";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
@@ -109,7 +108,7 @@ const run = async () => {
     const blockObject = await provider.getBlock(block);
     const unavailableDplymts = [];
     
-    await pMap(DeploymentIpfses, (async ipfsHash => {
+    DeploymentIpfses.forEach(async ipfsHash => {
       const localPOI = await fetchPOI(
         graphClient,
         ipfsHash,
@@ -140,7 +139,7 @@ const run = async () => {
         encodedMessage,
         `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
       );
-    }), {concurrency: 2})
+    })
 
     if (unavailableDplymts.length > 0) {
       console.log(
