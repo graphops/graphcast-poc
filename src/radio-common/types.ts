@@ -19,12 +19,6 @@ export type IndexerStakeResponse = {
   };
 };
 
-export type Attestation = {
-  nPOI: string;
-  indexerAddress: string;
-  stake: bigint;
-};
-
 export type Dispute = {
   id: string;
   status: string;
