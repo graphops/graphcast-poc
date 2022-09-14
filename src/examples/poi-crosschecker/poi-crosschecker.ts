@@ -93,7 +93,6 @@ const run = async () => {
 
         message = Message.toObject(decodedMessage, {
           nonce: Number,
-          timestamp: Number,
           blockNumber: Number,
           blockHash: String,
           sender: String,
@@ -110,7 +109,6 @@ const run = async () => {
 
       const {
         nonce,
-        timestamp,
         blockNumber,
         blockHash,
         sender,
@@ -121,7 +119,7 @@ const run = async () => {
 
       // temporarily removed self check for easy testing
       console.info(
-        `\n📮 A new message has been received!\nTimestamp: ${timestamp}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\nNonce: ${nonce}`
+        `\n📮 A new message has been received!\nNonce(timestamp in ms): ${nonce}\nBlock number: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\nSender: ${sender}\n`
           .green
       );
 
@@ -141,7 +139,6 @@ const run = async () => {
       const value = {
         messageJson: JSON.stringify({
           nonce: parseInt(nonce),
-          timestamp: parseInt(timestamp),
           blockNumber: parseInt(blockNumber),
           blockHash,
           subgraph,
@@ -170,13 +167,12 @@ const run = async () => {
       const stake = await radioFilter.poiMsgValidity(
         registryClient,
         sender,
-        timestamp,
+        subgraph,
         Number(nonce),
         blockHash,
         block
       );
       if (stake <= 0) {
-        console.warn(`\nMessage considered compromised, intercepting\n`.red);
         return;
       }
 
@@ -239,8 +235,7 @@ const run = async () => {
 
           const Message = root.lookupType("gossip.NPOIMessage");
           const rawMessage = {
-            nonce: messenger.nonce,
-            timestamp: new Date().getTime(),
+            nonce: Date.now(),
             blockNumber: blockObject.number,
             blockHash: blockObject.hash,
             subgraph: ipfsHash,
