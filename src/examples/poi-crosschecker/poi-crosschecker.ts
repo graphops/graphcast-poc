@@ -11,7 +11,7 @@ import {
   updateCostModel,
 } from "../../radio-common/queries";
 import RadioFilter from "../../radio-common/customs";
-import { Attestation, defaultModel, domain, printNPOIs, processAttestations, storeAttestations, types } from "./poi-helpers";
+import { Attestation, defaultModel, domain, poiMessageValues, printNPOIs, processAttestations, storeAttestations, types } from "./poi-helpers";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const protobuf = require("protobufjs");
@@ -19,7 +19,7 @@ const protobuf = require("protobufjs");
 const run = async () => {
   const observer = new Observer();
   const messenger = new Messenger();
-  const ethClient = new EthClient();
+  const ethClient = new EthClient(`http://${process.env.ETH_NODE}`, process.env.RADIO_OPERATOR_PRIVATE_KEY);
 
   await observer.init();
   await messenger.init();
@@ -31,8 +31,7 @@ const run = async () => {
     url: process.env.REGISTRY_SUBGRAPH,
     fetch,
   });
-  const graphNodeEndpoint = `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`;
-  const graphClient = createClient({ url: graphNodeEndpoint, fetch });
+  const graphClient = createClient({ url: `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`, fetch });
   const { provider } = ethClient;
   const indexerClient = createClient({
     url: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
@@ -56,13 +55,6 @@ const run = async () => {
       operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
-  let Message;
-  protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-    if (err) {
-      throw err;
-    }
-    Message = root.lookupType("gossip.NPOIMessage");    
-  });
 
   // Initial queries
   const allocations = await fetchAllocations(client, indexerAddress);
@@ -70,10 +62,6 @@ const run = async () => {
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
-  const poiMessageValues = (subgraph:string, nPOI:string) => {return {
-    subgraph,
-    nPOI,
-  }}
   console.log(
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
@@ -93,7 +81,8 @@ const run = async () => {
         `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-      const attestation:Attestation = await observer.prepareAttestation(Message, msg, domain, types, poiMessageValues, provider, radioFilter, registryClient)
+      const message = observer.readMessage(msg)
+      const attestation:Attestation = await observer.prepareAttestation(message, domain, types, poiMessageValues, provider, radioFilter, registryClient)
       storeAttestations(nPOIs, attestation)
       return nPOIs
     } catch {
@@ -132,7 +121,7 @@ const run = async () => {
         nPOI: localPOI,
       };
 
-      const encodedMessage = await messenger.writeMessage(ethClient, Message, rawMessage, domain, types, blockObject)
+      const encodedMessage = await messenger.writeMessage(ethClient, rawMessage, domain, types, blockObject)
 
       console.log(`:outbox_tray: Wrote and encoded message, sending`.green)
       await messenger.sendMessage(

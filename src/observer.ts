@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import { Waku } from "js-waku";
 import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
-import { Attestation } from "./examples/poi-crosschecker/poi-helpers";
+import { Attestation, NPOIMessage, NPOIMessagePayload } from "./examples/poi-crosschecker/poi-helpers";
 
 export class Observer {
   wakuInstance: Waku;
@@ -23,27 +23,20 @@ export class Observer {
     }, topics);
   }
 
-  // maybe radioFilter belong to the observer class
-  async prepareAttestation(Message, msg, domain, types, messageValue, provider, radioFilter, registryClient){
-    let message;
-      try {
-        const decodedMessage = Message.decode(msg);
+  //TODO: pass in the NPOI typings
+  readMessage(msg: Uint8Array){
+    try {
+      return NPOIMessage.decode(msg).payload as NPOIMessagePayload
+    } catch (error) {
+      console.error(
+        `Protobuf could not decode message, check formatting`
+      );
+      return;
+    }
+  }
 
-        message = Message.toObject(decodedMessage, {
-          subgraph: String,
-          nPOI: String,
-          nonce: Number,
-          blockNumber: Number,
-          blockHash: String,
-          signature: String,
-        });
-      } catch (error) {
-        console.error(
-          `Protobuf reader could not decode message, assume corrupted`
-        );
-        return;
-      }
-
+  // maybe include radioFilter as observer property
+  async prepareAttestation(message, domain, types, messageValue, provider, radioFilter, registryClient){
       // extract subgraph and nPOI based on provided types - for now use a defined 
       // messageValue
       const {

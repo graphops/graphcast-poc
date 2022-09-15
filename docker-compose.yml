@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  poi-crosschecker:
+    container_name: good-folk-1
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: echo 'running' | ls
+    environment:
+      ETH_NODE: host.docker.internal:8545
+      GRAPH_NODE_HOST: host.docker.internal
+      INDEXER_MANAGERMENT_SERVER: host.docker.internal:18000
+      RADIO_OPERATOR_PRIVATE_KEY: 806ccd0301ec455bfc94c71c9d199de4ce8838717a15da0a57a5d2cdc717bb5c
+    networks:
+      default:
+    # user: ${CURRENT_UID:?"Please run as follows 'CURRENT_UID=$(id -u):$(id -g) docker-compose up'"}
+    volume:
+      - .:/dist/src/examples/poi-crosschecker
+      - poi_crosschecker_node_modules:/src/examples/poi-crosschecker/node_modules
+
+volumes:
+  poi_crosschecker_node_modules:
