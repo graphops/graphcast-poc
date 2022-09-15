@@ -1,12 +1,18 @@
+import { ClientManager } from "./ethClient";
 import { ethers } from "ethers";
 import { Waku } from "js-waku";
 import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
-import { Attestation } from "./examples/poi-crosschecker/poi-helpers";
+import {
+  Attestation,
+} from "./examples/poi-crosschecker/poi-helpers";
+import RadioFilter from "./radio-common/customs";
 
 export class Observer {
   wakuInstance: Waku;
+  radioFilter: RadioFilter;
+  clientManager: ClientManager;
 
-  async init() {
+  async init(clients: ClientManager) {
     const waku = await Waku.create({
       bootstrap: {
         default: true,
@@ -15,6 +21,9 @@ export class Observer {
 
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
+
+    this.radioFilter = new RadioFilter();
+    this.clientManager = clients;
   }
 
   observe(topics: string[], handler: (msg: Uint8Array) => void): void {
@@ -23,72 +32,62 @@ export class Observer {
     }, topics);
   }
 
-  // maybe radioFilter belong to the observer class
-  async prepareAttestation(Message, msg, domain, types, messageValue, provider, radioFilter, registryClient){
-    let message;
-      try {
-        const decodedMessage = Message.decode(msg);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readMessage(msg: Uint8Array, MessageType: any) {
+    try {
+      return MessageType.decode(msg).payload;
+    } catch (error) {
+      console.error(`Protobuf could not decode message, check formatting`);
+      return;
+    }
+  }
 
-        message = Message.toObject(decodedMessage, {
-          subgraph: String,
-          nPOI: String,
-          nonce: Number,
-          blockNumber: Number,
-          blockHash: String,
-          signature: String,
-        });
-      } catch (error) {
-        console.error(
-          `Protobuf reader could not decode message, assume corrupted`
-        );
-        return;
-      }
+  // maybe include radioFilter as observer property
+  async prepareAttestation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MessageType: any
+  ): Promise<Attestation> {
+    //TODO: extract subgraph and nPOI based on provided typing
+    const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } =
+      message;
+    const value = MessageType.messageValues(subgraph, nPOI);
+    const hash = ethers.utils._TypedDataEncoder.hash(
+      MessageType.domain,
+      MessageType.types,
+      value
+    );
+    const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
-      // extract subgraph and nPOI based on provided types - for now use a defined 
-      // messageValue
-      const {
-        subgraph,
-        nPOI,
-        nonce,
-        blockNumber,
-        blockHash,
-        signature,
-      } = message;
+    // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
+    const block = await provider.getBlock(Number(blockNumber));
+    const stake = await radioFilter.poiMsgValidity(
+      registryClient,
+      sender,
+      subgraph,
+      Number(nonce),
+      blockHash,
+      block
+    );
+    if (stake <= 0) {
+      return;
+    }
 
-      const value = messageValue(subgraph, nPOI)
-      const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
-      const sender = ethers.utils
-        .recoverAddress(hash, signature)
-        .toLowerCase();
+    console.info(
+      `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
+        .green
+    );
 
-      // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const block = await provider.getBlock(Number(blockNumber));
-      const stake = await radioFilter.poiMsgValidity(
-        registryClient,
-        sender,
-        subgraph,
-        Number(nonce),
-        blockHash,
-        block
-      );
-      if (stake <= 0) {
-        return;
-      }
+    // can be built outside or using types
+    const attestation: Attestation = {
+      nPOI,
+      deployment: subgraph,
+      blockNumber: Number(blockNumber),
+      indexerAddress: sender,
+      stake: BigInt(stake),
+    };
 
-      console.info(
-        `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
-          .green
-      );
-
-      // can be built outside or using types
-      const attestation: Attestation = {
-        nPOI,
-        deployment: subgraph,
-        blockNumber: Number(blockNumber),
-        indexerAddress: sender,
-        stake: BigInt(stake),
-      };
-      
-      return attestation
+    return attestation;
   }
 }

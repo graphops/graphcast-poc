@@ -1,10 +1,12 @@
-import { EthClient } from './ethClient';
+import { NPOIMessage } from "./examples/poi-crosschecker/poi-helpers";
 import { Waku, WakuMessage } from "js-waku";
-
+import { ClientManager } from "./ethClient";
+import { BlockPointer } from "./radio-common/types";
 export class Messenger {
   wakuInstance: Waku;
+  clientManager: ClientManager;
 
-  async init() {
+  async init(clients: ClientManager) {
     const waku = await Waku.create({
       bootstrap: {
         default: true,
@@ -13,32 +15,44 @@ export class Messenger {
 
     // await waku.waitForRemotePeer();
     this.wakuInstance = waku;
+    this.clientManager = clients;
   }
 
-  async writeMessage(client, Message, rawMessage, domain, types, block){
-    const signature = await client.wallet._signTypedData(
-      domain,
-      types,
-      rawMessage
-    );
+  async writeMessage(
+    messageTyping: typeof NPOIMessage,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawMessage: any,
+    block: BlockPointer
+  ) {
+    try {
+      const signature = await this.clientManager.ethNode.wallet._signTypedData(
+        messageTyping.domain,
+        messageTyping.types,
+        rawMessage
+      );
 
-    const message = {
-      ...rawMessage,
-      nonce: Date.now(),
-      blockNumber: block.number,
-      blockHash: block.hash,
-      signature,
-    };
-    console.log("✍️ Signing... " + signature);
+      console.log("✍️ Signing... " + signature);
+      //TODO: abstract NPOIMessage
+      const message = new messageTyping({
+        subgraph: rawMessage.subgraph,
+        nPOI: rawMessage.nPOI,
+        nonce: Date.now(),
+        blockNumber: block.number,
+        blockHash: block.hash,
+        signature: signature,
+      });
 
-    const encodedMessage = Message.encode(message).finish();
-    return encodedMessage
+      const encodedMessage = message.encode();
+      return encodedMessage;
+    } catch (error) {
+      throw Error(
+        `Cannot write and encode the message, check formatting\n` + error
+      );
+    }
   }
 
   async sendMessage(encodedMessage: Uint8Array, topic: string) {
-    // move populate and encode message here
     const msg = await WakuMessage.fromBytes(encodedMessage, topic);
-
     await this.wakuInstance.relay.send(msg);
   }
 }

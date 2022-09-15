@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+
+docker-compose up
+
+WAIT_FOR_PG_ISREADY="while ! pg_isready --quiet; do sleep 1; done;"
+docker-compose exec postgres bash -c "$WAIT_FOR_PG_ISREADY"
+
+docker-compose run --rm poi-crosschecker
+
+docker-compose up -d
