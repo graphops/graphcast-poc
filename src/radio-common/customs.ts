@@ -1,19 +1,17 @@
-import { Block } from "@ethersproject/providers";
 import { Client } from "@urql/core";
 import {
   fetchDisputes,
   fetchMinStake,
-  fetchOperators,
   fetchStake,
   fetchOperatorOfIndexers,
 } from "./queries";
+import { BlockPointer } from "./types";
 
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   msgReplayLimit: number;
   minStakeReq: number;
-  // Map sender identity to <topic -> nonce>    //TODO: store between sessions
+  //TODO: store state before process exit
   nonceDirectory: Map<string, Map<string, number>>;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor() {
@@ -54,30 +52,31 @@ export default class RadioFilter {
   }
 
   // Message timestamp from within the past hour and match with block
-  public async replayCheck(timestamp: number, blockHash:string, block: Block) {
+  public async replayCheck(
+    timestamp: number,
+    blockHash: string,
+    block: BlockPointer
+  ) {
     const messageAge = new Date().getTime() - timestamp;
-    return messageAge <= 0 || messageAge >= this.msgReplayLimit || blockHash !== block.hash ||
-          timestamp < block.timestamp;
+    return (
+      messageAge <= 0 ||
+      messageAge >= this.msgReplayLimit ||
+      blockHash !== block.hash
+    );
   }
 
-  public inconsistentNonce(
-    sender: string,
-    deployment: string,
-    nonce: number,
-  ) {
-    // Correct block hash and message sent after block
-    // we said to drop the first message and add the nonce for future
-    if (!(sender in this.nonceDirectory)){
-      this.nonceDirectory[sender] = { deployment : nonce }
-      return true
-    } else if (!(deployment in this.nonceDirectory[sender])){
-      this.nonceDirectory[sender][deployment] = nonce
-      return true
+  public inconsistentNonce(sender: string, deployment: string, nonce: number) {
+    // check message nonce from local states for consistency
+    if (!(sender in this.nonceDirectory)) {
+      this.nonceDirectory[sender] = { [deployment]: nonce };
+      return true;
+    } else if (!(deployment in this.nonceDirectory[sender])) {
+      this.nonceDirectory[sender][deployment] = nonce;
+      return true;
     }
- 
-    const prevNonce:number = this.nonceDirectory[sender][deployment]
-    
-    console.log(`nonce comparison`, {prevNonce, nonce, inconsistent: prevNonce >= nonce})
+
+    const prevNonce: number = this.nonceDirectory[sender][deployment];
+
     return prevNonce >= nonce;
   }
 
@@ -96,12 +95,12 @@ export default class RadioFilter {
     deployment: string,
     nonce: number,
     blockHash: string,
-    block: Block
+    block: BlockPointer
   ) {
     // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(client, sender);
     if (!indexerAddress) {
-      console.warn(`👮 Sender not an operator, drop message`.red, {sender});
+      console.warn(`👮 Sender not an operator, drop message`.red, { sender });
       return 0;
     }
 
@@ -109,39 +108,36 @@ export default class RadioFilter {
     const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
     if (senderStake == 0 || tokensSlashed > 0) {
       console.warn(
-        `👮 Indexer identity failed stake requirement or has been slashed, drop message`.red, {
+        `👮 Indexer identity failed stake requirement or has been slashed, drop message`
+          .red,
+        {
           senderStake,
-          tokensSlashed
+          tokensSlashed,
         }
       );
       return 0;
     }
 
     // Message param checks
-    if (await this.replayCheck(nonce, blockHash, block)){
+    if (await this.replayCheck(nonce, blockHash, block)) {
+      console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
+        nonce,
+        blockHash,
+        queriedBlock: block.hash,
+      });
+      return 0;
+    }
+    if (this.inconsistentNonce(sender, deployment, nonce)) {
       console.warn(
-        `👮 Invalid timestamp (nonce), drop message`.red, {
-          nonce,
-          blockHash,
-          queriedBlock: block.hash,
-        }
-      );
-      return 0
-    } 
-    if (this.inconsistentNonce(
-      sender,
-      deployment,
-      nonce,
-    )){
-      console.warn(
-        `👮 Inconsistent nonce or first time sender, drop message`.red, {
+        `👮 Inconsistent nonce or first time sender, drop message`.red,
+        {
           sender,
           deployment,
-          nonce
+          nonce,
         }
       );
       return 0;
     }
-    return senderStake
+    return senderStake;
   }
 }

@@ -192,7 +192,7 @@ export async function fetchMinStake(client: Client) {
     return result.data.graphNetwork.minimumIndexerStake;
   } catch (error) {
     console.warn(`Failed to fetch minimum indexer stake requirement`);
-    return Number.POSITIVE_INFINITY
+    return Number.POSITIVE_INFINITY;
   }
 }
 
