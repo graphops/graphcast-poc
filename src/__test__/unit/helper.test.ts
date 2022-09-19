@@ -1,15 +1,15 @@
-import { EthClient } from '../../ethClient';
-import path from 'path'
+import { EthClient } from "../../ethClient";
+import path from "path";
 import fetch from "isomorphic-fetch";
-import { Messenger } from '../../messenger';
-import { domain, NPOIMessage, poiMessageValues, types } from '../../examples/poi-crosschecker/poi-helpers';
-import { Observer } from '../../observer';
-import RadioFilter from '../../radio-common/customs';
-import { createClient } from '@urql/core';
+import { Messenger } from "../../messenger";
+import { NPOIMessage } from "../../examples/poi-crosschecker/poi-helpers";
+import { Observer } from "../../observer";
+import RadioFilter from "../../radio-common/customs";
+import { createClient } from "@urql/core";
 
-declare const ETH_NODE
-declare const RADIO_OPERATOR_PRIVATE_KEY
-declare const REGISTRY_SUBGRAPH
+declare const ETH_NODE;
+declare const RADIO_OPERATOR_PRIVATE_KEY;
+declare const REGISTRY_SUBGRAPH;
 
 let messenger;
 let observer;
@@ -18,79 +18,152 @@ let block;
 let radioFilter;
 let registryClient;
 const setup = async () => {
-    Date.now = jest.fn(() => Date.parse('2022-01-01'))
+  Date.now = jest.fn(() => new Date().getTime() - 3_500_000);
 
-    messenger = new Messenger();
-    observer = new Observer();
-    ethClient = new EthClient(`http://${ETH_NODE}`, RADIO_OPERATOR_PRIVATE_KEY);
-    await messenger.init();
-    await observer.init();
-    radioFilter = new RadioFilter();
-    registryClient = createClient({
-        url: REGISTRY_SUBGRAPH,
-        fetch,
-      });
-        
-    block = {
-        number: 1,
-        hash: "0x0001",
-    }
-}
+  messenger = new Messenger();
+  observer = new Observer();
+  ethClient = new EthClient(`http://${ETH_NODE}`, RADIO_OPERATOR_PRIVATE_KEY);
+  await messenger.init();
+  await observer.init();
+  radioFilter = new RadioFilter();
+  registryClient = createClient({
+    url: REGISTRY_SUBGRAPH,
+    fetch,
+  });
 
-describe('Messenger and Observer helpers', () => {
-    beforeAll(setup)
-    describe('Write and Observe', () => {
-        test('write and observe a message - success', async () => {
-            const rawMessage = {
-                subgraph: "Qmaaa",
-                nPOI: "poi0"
-            }
+  block = {
+    number: 1,
+    hash: "0x0001",
+  };
+  ethClient.provider.getBlock = jest.fn((number) => {
+    return {
+      number: number,
+      hash: "0x000" + number,
+      timestamp: new Date().getTime() - 3_550_000,
+    };
+  });
+};
 
-            const encodedMessage = await messenger.writeMessage(ethClient, rawMessage, domain, types, block)
-            expect(encodedMessage).toBeDefined()
-            
-            const message = observer.readMessage(encodedMessage)
-            expect(Number(message.blockNumber)).toEqual(block.number)
-            expect(message.nPOI).toEqual(rawMessage.nPOI)
-        })
+describe("Messenger and Observer helpers", () => {
+  beforeAll(setup);
+  describe("Write and Observe", () => {
+    test("write and observe a message - success", async () => {
+      const rawMessage = {
+        subgraph: "Qmaaa",
+        nPOI: "poi0",
+      };
 
-        test('write a message - wrong protobuf format', async () => {
-            const rawMessage = {
-                deployment: "withoutPOI"
-            }
+      const encodedMessage = await messenger.writeMessage(
+        ethClient,
+        NPOIMessage,
+        rawMessage,
+        block
+      );
+      expect(encodedMessage).toBeDefined();
 
-            await expect(async () => {await messenger.writeMessage(ethClient, rawMessage, domain, types, block)})
-            .rejects
-            .toThrowError(`Cannot write and encode the message, check formatting`);
-        })
+      // wanted to test calling the waku node but going to leave for integration tests
 
-        test('getOperator from registry',async () => {
-            const { provider } = ethClient;
-            const operatorAddress = ethClient.getAddress().toLowerCase();
-            console.log(operatorAddress)
-        })
+      const message = observer.readMessage(encodedMessage, NPOIMessage);
+      expect(Number(message.blockNumber)).toEqual(block.number);
+      expect(message.nPOI).toEqual(rawMessage.nPOI);
+    });
 
-        // // test the observer
-        // test('Observer prepare attestations',async () => {
-        //     const { provider } = ethClient;
-        //     const rawMessage = {
-        //         subgraph: "Qmaaa",
-        //         nPOI: "poi0"
-        //     }
+    test("write a message - wrong protobuf format", async () => {
+      const rawMessage = {
+        deployment: "withoutPOI",
+      };
 
-        //     const encodedMessage = await messenger.writeMessage(ethClient, rawMessage, domain, types, block)
-        //     const message = observer.readMessage(encodedMessage)
+      await expect(async () => {
+        await messenger.writeMessage(ethClient, NPOIMessage, rawMessage, block);
+      }).rejects.toThrowError(
+        `Cannot write and encode the message, check formatting`
+      );
+    });
 
-        //     // fails the first time
-        //     const attestation = await observer.prepareAttestation(message, domain, types, poiMessageValues, provider, radioFilter, registryClient)
-        //     console.log(`hm`,attestation)
+    test("read a message - wrong protobuf format", async () => {
+      const message = {
+        subgraph: "Qmaaa",
+        nPOI: "poi0",
+      };
 
-        //     // but the second time with a higher nonce... should be okay?
-        //     Date.now = jest.fn(() => Date.parse('2022-01-02'))
-        //     const attestation2 = await observer.prepareAttestation(message, domain, types, poiMessageValues, provider, radioFilter, registryClient)
-        //     console.log(`hm2`,attestation2)
+      const encodedMessage = await messenger.writeMessage(
+        ethClient,
+        NPOIMessage,
+        message,
+        block
+      );
+      expect(observer.readMessage(encodedMessage)).toBeUndefined();
+    });
 
+    test("Gossip agent registry check", async () => {
+      const operatorAddress = ethClient.getAddress().toLowerCase();
+      const indexerAddress = await radioFilter.isOperatorOf(
+        registryClient,
+        operatorAddress
+      );
+      expect(indexerAddress).toBeDefined();
+    });
 
-        // }, 120_000)
-  })
-})
+    // test the observer
+    test("Observer prepare attestations", async () => {
+      const rawMessage = {
+        subgraph: "Qmaaa",
+        nPOI: "poi0",
+      };
+
+      const encodedMessage = await messenger.writeMessage(
+        ethClient,
+        NPOIMessage,
+        rawMessage,
+        block
+      );
+      const message = observer.readMessage(encodedMessage, NPOIMessage);
+
+      // first message always fails
+      const attestation = await observer.prepareAttestation(
+        message,
+        NPOIMessage,
+        ethClient.provider,
+        radioFilter,
+        registryClient
+      );
+      expect(attestation).toBeUndefined();
+
+      // later message with a higher nonce...
+      Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
+      const encodedMessage2 = await messenger.writeMessage(
+        ethClient,
+        NPOIMessage,
+        rawMessage,
+        block
+      );
+      const message2 = observer.readMessage(encodedMessage2, NPOIMessage);
+      const attestation2 = await observer.prepareAttestation(
+        message2,
+        NPOIMessage,
+        ethClient.provider,
+        radioFilter,
+        registryClient
+      );
+      expect(attestation2).toBeDefined();
+
+      // tries to inject to the past
+      Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
+      const encodedMessage3 = await messenger.writeMessage(
+        ethClient,
+        NPOIMessage,
+        rawMessage,
+        block
+      );
+      const message3 = observer.readMessage(encodedMessage3, NPOIMessage);
+      const attestation3 = await observer.prepareAttestation(
+        message3,
+        NPOIMessage,
+        ethClient.provider,
+        radioFilter,
+        registryClient
+      );
+      expect(attestation3).toBeUndefined();
+    });
+  });
+});

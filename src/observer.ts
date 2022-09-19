@@ -1,7 +1,12 @@
+import { Client } from "@urql/core";
 import { ethers } from "ethers";
 import { Waku } from "js-waku";
 import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
-import { Attestation, NPOIMessage, NPOIMessagePayload } from "./examples/poi-crosschecker/poi-helpers";
+import {
+  Attestation,
+  NPOIMessage,
+} from "./examples/poi-crosschecker/poi-helpers";
+import customs from "./radio-common/customs";
 
 export class Observer {
   wakuInstance: Waku;
@@ -23,65 +28,64 @@ export class Observer {
     }, topics);
   }
 
-  //TODO: pass in the NPOI typings
-  readMessage(msg: Uint8Array){
+  readMessage(msg: Uint8Array, messageType: typeof NPOIMessage) {
     try {
-      return NPOIMessage.decode(msg).payload as NPOIMessagePayload
+      return messageType.decode(msg).payload;
     } catch (error) {
-      console.error(
-        `Protobuf could not decode message, check formatting`
-      );
+      console.error(`Protobuf could not decode message, check formatting`);
       return;
     }
   }
 
   // maybe include radioFilter as observer property
-  async prepareAttestation(message, domain, types, messageValue, provider, radioFilter, registryClient){
-      // extract subgraph and nPOI based on provided types - for now use a defined 
-      // messageValue
-      const {
-        subgraph,
-        nPOI,
-        nonce,
-        blockNumber,
-        blockHash,
-        signature,
-      } = message;
+  async prepareAttestation(
+    message: any,
+    NPOIMessage: any,
+    provider: ethers.providers.JsonRpcProvider,
+    radioFilter: customs,
+    registryClient: Client
+  ) {
+    // extract subgraph and nPOI based on provided types - for now use a defined
+    // messageValues
+    const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } =
+      message;
 
-      const value = messageValue(subgraph, nPOI)
-      const hash = ethers.utils._TypedDataEncoder.hash(domain, types, value);
-      const sender = ethers.utils
-        .recoverAddress(hash, signature)
-        .toLowerCase();
+    const value = NPOIMessage.messageValues(subgraph, nPOI);
+    const hash = ethers.utils._TypedDataEncoder.hash(
+      NPOIMessage.domain,
+      NPOIMessage.types,
+      value
+    );
+    const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
-      // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-      const block = await provider.getBlock(Number(blockNumber));
-      const stake = await radioFilter.poiMsgValidity(
-        registryClient,
-        sender,
-        subgraph,
-        Number(nonce),
-        blockHash,
-        block
-      );
-      if (stake <= 0) {
-        return;
-      }
+    // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
+    const block = await provider.getBlock(Number(blockNumber));
+    const stake = await radioFilter.poiMsgValidity(
+      registryClient,
+      sender,
+      subgraph,
+      Number(nonce),
+      blockHash,
+      block
+    );
+    if (stake <= 0) {
+      return;
+    }
 
-      console.info(
-        `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
-          .green
-      );
+    console.info(
+      `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
+        .green
+    );
 
-      // can be built outside or using types
-      const attestation: Attestation = {
-        nPOI,
-        deployment: subgraph,
-        blockNumber: Number(blockNumber),
-        indexerAddress: sender,
-        stake: BigInt(stake),
-      };
-      
-      return attestation
+    // can be built outside or using types
+    const attestation: Attestation = {
+      nPOI,
+      deployment: subgraph,
+      blockNumber: Number(blockNumber),
+      indexerAddress: sender,
+      stake: BigInt(stake),
+    };
+
+    return attestation;
   }
 }

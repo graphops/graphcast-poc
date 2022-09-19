@@ -6,9 +6,7 @@ export class EthClient {
   wallet: Wallet;
 
   constructor(api, private_key) {
-    const provider = new ethers.providers.JsonRpcProvider(
-      api
-    );
+    const provider = new ethers.providers.JsonRpcProvider(api);
     this.provider = provider;
 
     const wallet = new Wallet(private_key);
