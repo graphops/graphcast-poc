@@ -166,6 +166,7 @@ export class NPOIMessage {
   get nPOI(): string {
     return this.payload.nPOI;
   }
+  
   //todo: auto-generate with types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public static messageValues(subgraph: string, nPOI: string): any {
