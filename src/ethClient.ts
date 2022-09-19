@@ -5,13 +5,11 @@ export class EthClient {
   provider: JsonRpcProvider;
   wallet: Wallet;
 
-  constructor() {
-    const provider = new ethers.providers.JsonRpcProvider(
-      `http://${process.env.ETH_NODE}`
-    );
+  constructor(api, private_key) {
+    const provider = new ethers.providers.JsonRpcProvider(api);
     this.provider = provider;
 
-    const wallet = new Wallet(process.env.RADIO_OPERATOR_PRIVATE_KEY);
+    const wallet = new Wallet(private_key);
     this.wallet = wallet.connect(provider);
   }
 

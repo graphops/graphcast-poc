@@ -1,6 +1,7 @@
-import { EthClient } from './ethClient';
+import { NPOIMessage } from "./examples/poi-crosschecker/poi-helpers";
 import { Waku, WakuMessage } from "js-waku";
-
+import { Block } from "@ethersproject/abstract-provider";
+import { EthClient } from "./ethClient";
 export class Messenger {
   wakuInstance: Waku;
 
@@ -15,30 +16,41 @@ export class Messenger {
     this.wakuInstance = waku;
   }
 
-  async writeMessage(client, Message, rawMessage, domain, types, block){
-    const signature = await client.wallet._signTypedData(
-      domain,
-      types,
-      rawMessage
-    );
+  async writeMessage(
+    client: EthClient,
+    messageTyping: typeof NPOIMessage,
+    rawMessage: { subgraph: any; nPOI: any },
+    block: Block
+  ) {
+    try {
+      const signature = await client.wallet._signTypedData(
+        messageTyping.domain,
+        messageTyping.types,
+        rawMessage
+      );
 
-    const message = {
-      ...rawMessage,
-      nonce: Date.now(),
-      blockNumber: block.number,
-      blockHash: block.hash,
-      signature,
-    };
-    console.log("✍️ Signing... " + signature);
+      console.log("✍️ Signing... " + signature);
+      //TODO: abstract NPOIMessage
+      const message = new messageTyping({
+        subgraph: rawMessage.subgraph,
+        nPOI: rawMessage.nPOI,
+        nonce: Date.now(),
+        blockNumber: block.number,
+        blockHash: block.hash,
+        signature: signature,
+      });
 
-    const encodedMessage = Message.encode(message).finish();
-    return encodedMessage
+      const encodedMessage = message.encode();
+      return encodedMessage;
+    } catch (error) {
+      throw Error(
+        `Cannot write and encode the message, check formatting\n` + error
+      );
+    }
   }
 
   async sendMessage(encodedMessage: Uint8Array, topic: string) {
-    // move populate and encode message here
     const msg = await WakuMessage.fromBytes(encodedMessage, topic);
-
     await this.wakuInstance.relay.send(msg);
   }
 }
