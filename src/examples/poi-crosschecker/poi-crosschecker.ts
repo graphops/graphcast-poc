@@ -6,10 +6,12 @@ import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { EthClient } from "../../ethClient";
 import {
-  fetchAllocations,
   fetchPOI,
   updateCostModel,
-} from "../../radio-common/queries";
+} from "./queries";
+import {
+  fetchAllocations,
+} from "./queries";
 import RadioFilter from "../../radio-common/customs";
 import {
   Attestation,
@@ -18,25 +20,25 @@ import {
   processAttestations,
   storeAttestations,
   NPOIMessage,
-} from "./poi-helpers";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const protobuf = require("protobufjs");
+  prepareAttestation,
+} from "./utils";
 
 const run = async () => {
   const observer = new Observer();
   const messenger = new Messenger();
-  const ethClient = new EthClient(
-    `http://${process.env.ETH_NODE}`,
-    process.env.RADIO_OPERATOR_PRIVATE_KEY
-  );
+  const ethClient = new EthClient({
+    infuraApiKey: process.env.INFURA_API_KEY,
+    operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
+    network: "goerli"
+  });
 
   await observer.init();
   await messenger.init();
 
+  // TODO: Extract registry address operations to sdk level
   const operatorAddress = ethClient.getAddress().toLowerCase();
 
-  const client = createClient({ url: process.env.NETWORK_URL, fetch });
+  const gatewayClient = createClient({ url: process.env.NETWORK_URL, fetch });
   const registryClient = createClient({
     url: process.env.REGISTRY_SUBGRAPH,
     fetch,
@@ -68,9 +70,10 @@ const run = async () => {
       operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
+  // TODO: Everything above should be moved to sdk level
 
   // Initial queries
-  const allocations = await fetchAllocations(client, indexerAddress);
+  const allocations = await fetchAllocations(gatewayClient, indexerAddress);
   const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
@@ -95,11 +98,10 @@ const run = async () => {
           .green
       );
       const message = observer.readMessage(msg, NPOIMessage);
-      const attestation: Attestation = await observer.prepareAttestation(
+      const attestation: Attestation = await prepareAttestation(
         message,
         NPOIMessage,
         provider,
-        radioFilter,
         registryClient
       );
       storeAttestations(nPOIs, attestation);

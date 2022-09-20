@@ -2,7 +2,7 @@ import { EthClient } from "../../ethClient";
 import path from "path";
 import fetch from "isomorphic-fetch";
 import { Messenger } from "../../messenger";
-import { NPOIMessage } from "../../examples/poi-crosschecker/poi-helpers";
+import { NPOIMessage } from "../../examples/poi-crosschecker/utils";
 import { Observer } from "../../observer";
 import RadioFilter from "../../radio-common/customs";
 import { createClient } from "@urql/core";
@@ -22,7 +22,10 @@ const setup = async () => {
 
   messenger = new Messenger();
   observer = new Observer();
-  ethClient = new EthClient(`http://${ETH_NODE}`, RADIO_OPERATOR_PRIVATE_KEY);
+  ethClient = new EthClient({
+    ethNode: `http://${ETH_NODE}`,
+    operatorPrivateKey: RADIO_OPERATOR_PRIVATE_KEY,
+  });
   await messenger.init();
   await observer.init();
   radioFilter = new RadioFilter();

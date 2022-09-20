@@ -1,4 +1,4 @@
-import { NPOIMessage } from "./examples/poi-crosschecker/poi-helpers";
+import { NPOIMessage } from "./examples/poi-crosschecker/utils";
 import { Waku, WakuMessage } from "js-waku";
 import { Block } from "@ethersproject/abstract-provider";
 import { EthClient } from "./ethClient";
@@ -19,7 +19,7 @@ export class Messenger {
   async writeMessage(
     client: EthClient,
     messageTyping: typeof NPOIMessage,
-    rawMessage: { subgraph: any; nPOI: any },
+    rawMessage: { subgraph: string; nPOI: string },
     block: Block
   ) {
     try {

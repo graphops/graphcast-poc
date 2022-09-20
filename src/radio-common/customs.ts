@@ -1,9 +1,8 @@
 import { Block } from "@ethersproject/providers";
 import { Client } from "@urql/core";
+
 import {
-  fetchDisputes,
   fetchMinStake,
-  fetchOperators,
   fetchStake,
   fetchOperatorOfIndexers,
 } from "./queries";
@@ -77,66 +76,5 @@ export default class RadioFilter {
     const prevNonce: number = this.nonceDirectory[sender][deployment];
 
     return prevNonce >= nonce;
-  }
-
-  public async disputeStatusCheck(client: Client, address: string) {
-    const senderDisputes = await fetchDisputes(client, address);
-    //Note: a more relaxed check is if there's dispute with Undecided status
-    return senderDisputes.reduce(
-      (slashedRecord, dispute) => slashedRecord + Number(dispute.tokensSlashed),
-      0
-    );
-  }
-
-  public async poiMsgValidity(
-    client: Client,
-    sender: string,
-    deployment: string,
-    nonce: number,
-    blockHash: string,
-    block: Block
-  ) {
-    // Resolve signer to indexer identity and check stake and dispute statuses
-    const indexerAddress = await this.isOperatorOf(client, sender);
-    if (!indexerAddress) {
-      console.warn(`👮 Sender not an operator, drop message`.red, { sender });
-      return 0;
-    }
-
-    const senderStake = await this.indexerCheck(client, indexerAddress);
-    const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
-    if (senderStake == 0 || tokensSlashed > 0) {
-      console.warn(
-        `👮 Indexer identity failed stake requirement or has been slashed, drop message`
-          .red,
-        {
-          senderStake,
-          tokensSlashed,
-        }
-      );
-      return 0;
-    }
-
-    // Message param checks
-    if (await this.replayCheck(nonce, blockHash, block)) {
-      console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
-        nonce,
-        blockHash,
-        queriedBlock: block.hash,
-      });
-      return 0;
-    }
-    if (this.inconsistentNonce(sender, deployment, nonce)) {
-      console.warn(
-        `👮 Inconsistent nonce or first time sender, drop message`.red,
-        {
-          sender,
-          deployment,
-          nonce,
-        }
-      );
-      return 0;
-    }
-    return senderStake;
   }
 }

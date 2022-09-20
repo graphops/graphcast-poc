@@ -1,8 +1,12 @@
 import bs58 from "bs58";
 import "colors";
 import * as protobuf from "protobufjs/light";
+import { Client } from "@urql/core";
+import { fetchDisputes } from "./queries";
+import { Block } from "@ethersproject/providers";
+import RadioFilter from "../../radio-common/customs";
+import { ethers } from "ethers";
 
-// POI topic configs, can probably be moved into POI message class
 export type Attestation = {
   nPOI: string;
   deployment: string;
@@ -21,7 +25,7 @@ export function processAttestations(localnPOIs, nPOIs, targetBlock) {
       !nPOIs.get(subgraphDeployment).has(targetBlock)
     ) {
       console.debug(
-        `No attestations for $(subgraphDeployment) on block ${targetBlock} at the moment`
+        `No attestations for ${subgraphDeployment} on block ${targetBlock} at the moment`
       );
       return [];
     }
@@ -110,7 +114,6 @@ const Root = protobuf.Root,
   Type = protobuf.Type,
   Field = protobuf.Field;
 
-//Abstract the message to 3 layers
 export interface NPOIMessagePayload {
   subgraph: string;
   nPOI: string;
@@ -130,7 +133,7 @@ export class NPOIMessage {
     .add(new Field("blockHash", 5, "string"))
     .add(new Field("signature", 6, "string"));
 
-  private static Root = new Root().define("gossip").add(NPOIMessage.Type);
+  // private static Root = new Root().define("gossip").add(NPOIMessage.Type);
   public static domain = {
     name: `graphcast-poi-crosschecker`,
     version: "0",
@@ -167,10 +170,128 @@ export class NPOIMessage {
     return this.payload.nPOI;
   }
 
-  public static messageValues(subgraph: string, nPOI: string): any {
+  public static messageValues(
+    subgraph: string,
+    nPOI: string
+  ): { subgraph: string; nPOI: string } {
     return {
       subgraph,
       nPOI,
     };
   }
 }
+
+export const disputeStatusCheck = async (client: Client, address: string) => {
+  const senderDisputes = await fetchDisputes(client, address);
+  //Note: a more relaxed check is if there's dispute with Undecided status
+  return senderDisputes.reduce(
+    (slashedRecord, dispute) => slashedRecord + Number(dispute.tokensSlashed),
+    0
+  );
+};
+
+// TODO: Move this into the poi example
+export const poiMsgValidity = async (
+  client: Client,
+  sender: string,
+  deployment: string,
+  nonce: number,
+  blockHash: string,
+  block: Block
+) => {
+  const radioFilter = new RadioFilter();
+
+  // Resolve signer to indexer identity and check stake and dispute statuses
+  const indexerAddress = await radioFilter.isOperatorOf(client, sender);
+  if (!indexerAddress) {
+    console.warn(`👮 Sender not an operator, drop message`.red, { sender });
+    return 0;
+  }
+
+  const senderStake = await radioFilter.indexerCheck(client, indexerAddress);
+  const tokensSlashed = await disputeStatusCheck(client, indexerAddress);
+  if (senderStake == 0 || tokensSlashed > 0) {
+    console.warn(
+      `👮 Indexer identity failed stake requirement or has been slashed, drop message`
+        .red,
+      {
+        senderStake,
+        tokensSlashed,
+      }
+    );
+    return 0;
+  }
+
+  // Message param checks
+  if (await radioFilter.replayCheck(nonce, blockHash, block)) {
+    console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
+      nonce,
+      blockHash,
+      queriedBlock: block.hash,
+    });
+    return 0;
+  }
+  if (radioFilter.inconsistentNonce(sender, deployment, nonce)) {
+    console.warn(
+      `👮 Inconsistent nonce or first time sender, drop message`.red,
+      {
+        sender,
+        deployment,
+        nonce,
+      }
+    );
+    return 0;
+  }
+  return senderStake;
+};
+
+// TODO: Remove from here
+// maybe include radioFilter as observer property
+export const prepareAttestation = async (
+  message: any,
+  NPOIMessage: any,
+  provider: ethers.providers.JsonRpcProvider,
+  registryClient: Client
+) => {
+  // extract subgraph and nPOI based on provided types - for now use a defined
+  // messageValues
+  const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } = message;
+
+  const value = NPOIMessage.messageValues(subgraph, nPOI);
+  const hash = ethers.utils._TypedDataEncoder.hash(
+    NPOIMessage.domain,
+    NPOIMessage.types,
+    value
+  );
+  const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
+
+  // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
+  const block = await provider.getBlock(Number(blockNumber));
+  const stake = await poiMsgValidity(
+    registryClient,
+    sender,
+    subgraph,
+    Number(nonce),
+    blockHash,
+    block
+  );
+  if (stake <= 0) {
+    return;
+  }
+
+  console.info(
+    `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
+      .green
+  );
+
+  // can be built outside or using types
+  const attestation: Attestation = {
+    nPOI,
+    deployment: subgraph,
+    blockNumber: Number(blockNumber),
+    indexerAddress: sender,
+    stake: BigInt(stake),
+  };
+
+  return attestation;
+};
