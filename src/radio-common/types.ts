@@ -30,3 +30,5 @@ export type CostModel = {
   model: string;
   variables?: string;
 };
+
+export type BlockPointer = { number: number; hash: string };

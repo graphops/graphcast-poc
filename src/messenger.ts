@@ -1,11 +1,12 @@
 import { NPOIMessage } from "./examples/poi-crosschecker/poi-helpers";
 import { Waku, WakuMessage } from "js-waku";
-import { Block } from "@ethersproject/abstract-provider";
-import { EthClient } from "./ethClient";
+import { ClientManager } from "./ethClient";
+import { BlockPointer } from "./radio-common/types";
 export class Messenger {
   wakuInstance: Waku;
+  clientManager: ClientManager;
 
-  async init() {
+  async init(clients: ClientManager) {
     const waku = await Waku.create({
       bootstrap: {
         default: true,
@@ -14,16 +15,17 @@ export class Messenger {
 
     // await waku.waitForRemotePeer();
     this.wakuInstance = waku;
+    this.clientManager = clients;
   }
 
   async writeMessage(
-    client: EthClient,
     messageTyping: typeof NPOIMessage,
-    rawMessage: { subgraph: any; nPOI: any },
-    block: Block
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rawMessage: any,
+    block: BlockPointer
   ) {
     try {
-      const signature = await client.wallet._signTypedData(
+      const signature = await this.clientManager.ethNode.wallet._signTypedData(
         messageTyping.domain,
         messageTyping.types,
         rawMessage

@@ -1,19 +1,17 @@
-import { Block } from "@ethersproject/providers";
 import { Client } from "@urql/core";
 import {
   fetchDisputes,
   fetchMinStake,
-  fetchOperators,
   fetchStake,
   fetchOperatorOfIndexers,
 } from "./queries";
+import { BlockPointer } from "./types";
 
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   msgReplayLimit: number;
   minStakeReq: number;
-  // Map sender identity to <topic -> nonce>    //TODO: store between sessions
+  //TODO: store state before process exit
   nonceDirectory: Map<string, Map<string, number>>;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   constructor() {
@@ -54,13 +52,16 @@ export default class RadioFilter {
   }
 
   // Message timestamp from within the past hour and match with block
-  public async replayCheck(timestamp: number, blockHash: string, block: Block) {
+  public async replayCheck(
+    timestamp: number,
+    blockHash: string,
+    block: BlockPointer
+  ) {
     const messageAge = new Date().getTime() - timestamp;
     return (
       messageAge <= 0 ||
       messageAge >= this.msgReplayLimit ||
-      blockHash !== block.hash ||
-      timestamp < block.timestamp
+      blockHash !== block.hash
     );
   }
 
@@ -94,7 +95,7 @@ export default class RadioFilter {
     deployment: string,
     nonce: number,
     blockHash: string,
-    block: Block
+    block: BlockPointer
   ) {
     // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(client, sender);

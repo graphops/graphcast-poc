@@ -1,17 +1,18 @@
-import { Client } from "@urql/core";
+import { ClientManager } from "./ethClient";
 import { ethers } from "ethers";
 import { Waku } from "js-waku";
 import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
 import {
   Attestation,
-  NPOIMessage,
 } from "./examples/poi-crosschecker/poi-helpers";
-import customs from "./radio-common/customs";
+import RadioFilter from "./radio-common/customs";
 
 export class Observer {
   wakuInstance: Waku;
+  radioFilter: RadioFilter;
+  clientManager: ClientManager;
 
-  async init() {
+  async init(clients: ClientManager) {
     const waku = await Waku.create({
       bootstrap: {
         default: true,
@@ -20,6 +21,9 @@ export class Observer {
 
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
+
+    this.radioFilter = new RadioFilter();
+    this.clientManager = clients;
   }
 
   observe(topics: string[], handler: (msg: Uint8Array) => void): void {
@@ -28,9 +32,10 @@ export class Observer {
     }, topics);
   }
 
-  readMessage(msg: Uint8Array, messageType: typeof NPOIMessage) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readMessage(msg: Uint8Array, MessageType: any) {
     try {
-      return messageType.decode(msg).payload;
+      return MessageType.decode(msg).payload;
     } catch (error) {
       console.error(`Protobuf could not decode message, check formatting`);
       return;
@@ -39,29 +44,28 @@ export class Observer {
 
   // maybe include radioFilter as observer property
   async prepareAttestation(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     message: any,
-    NPOIMessage: any,
-    provider: ethers.providers.JsonRpcProvider,
-    radioFilter: customs,
-    registryClient: Client
-  ) {
-    // extract subgraph and nPOI based on provided types - for now use a defined
-    // messageValues
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MessageType: any
+  ): Promise<Attestation> {
+    //TODO: extract subgraph and nPOI based on provided typing
     const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } =
       message;
-
-    const value = NPOIMessage.messageValues(subgraph, nPOI);
+    const value = MessageType.messageValues(subgraph, nPOI);
     const hash = ethers.utils._TypedDataEncoder.hash(
-      NPOIMessage.domain,
-      NPOIMessage.types,
+      MessageType.domain,
+      MessageType.types,
       value
     );
     const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
     // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-    const block = await provider.getBlock(Number(blockNumber));
-    const stake = await radioFilter.poiMsgValidity(
-      registryClient,
+    const block = await this.clientManager.ethNode.buildBlock(
+      Number(blockNumber)
+    );
+    const stake = await this.radioFilter.poiMsgValidity(
+      this.clientManager.registry,
       sender,
       subgraph,
       Number(nonce),
