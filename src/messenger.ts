@@ -1,5 +1,7 @@
-import { EthClient } from './ethClient';
 import { Waku, WakuMessage } from "js-waku";
+
+//eslint-disable-next-line @typescript-eslint/no-var-requires
+const protobuf = require("protobufjs");
 
 export class Messenger {
   wakuInstance: Waku;
@@ -11,19 +13,20 @@ export class Messenger {
       },
     });
 
-    // await waku.waitForRemotePeer();
+    await waku.waitForRemotePeer();
     this.wakuInstance = waku;
   }
 
-  async writeMessage(client, Message, rawMessage, domain, types, block){
+  // TODO: Remove topic, pass Radio id or something like that
+  async sendMessage(client, content, domain, types, block, topic) {
     const signature = await client.wallet._signTypedData(
       domain,
       types,
-      rawMessage
+      content
     );
 
-    const message = {
-      ...rawMessage,
+    const rawMessage = {
+      content: content,
       nonce: Date.now(),
       blockNumber: block.number,
       blockHash: block.hash,
@@ -31,14 +34,18 @@ export class Messenger {
     };
     console.log("✍️ Signing... " + signature);
 
-    const encodedMessage = Message.encode(message).finish();
-    return encodedMessage
-  }
+    let protoMessage;
+    protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+      if (err) {
+        throw err;
+      }
+      protoMessage = root.lookupType("gossip.NPOIMessage");
+    });
 
-  async sendMessage(encodedMessage: Uint8Array, topic: string) {
-    // move populate and encode message here
+    const encodedMessage = protoMessage.encode(rawMessage).finish();
     const msg = await WakuMessage.fromBytes(encodedMessage, topic);
 
     await this.wakuInstance.relay.send(msg);
+
   }
 }

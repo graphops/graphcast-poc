@@ -11,10 +11,16 @@ import {
   updateCostModel,
 } from "../../radio-common/queries";
 import RadioFilter from "../../radio-common/customs";
-import { Attestation, defaultModel, domain, printNPOIs, processAttestations, storeAttestations, types } from "./poi-helpers";
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const protobuf = require("protobufjs");
+import {
+  Attestation,
+  defaultModel,
+  domain,
+  printNPOIs,
+  processAttestations,
+  storeAttestations,
+  types,
+  prepareAttestation,
+} from "./utils";
 
 const run = async () => {
   const observer = new Observer();
@@ -24,9 +30,10 @@ const run = async () => {
   await observer.init();
   await messenger.init();
 
+  // TODO: Move this to eth client
   const operatorAddress = ethClient.getAddress().toLowerCase();
 
-  const client = createClient({ url: process.env.NETWORK_URL, fetch });
+  const gatewayclient = createClient({ url: process.env.NETWORK_URL, fetch });
   const registryClient = createClient({
     url: process.env.REGISTRY_SUBGRAPH,
     fetch,
@@ -56,24 +63,27 @@ const run = async () => {
       operatorPublicKey: ethClient.wallet.publicKey,
     }
   );
-  let Message;
-  protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
-    if (err) {
-      throw err;
-    }
-    Message = root.lookupType("gossip.NPOIMessage");    
-  });
+
+  // let Message;
+  // protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+  //   if (err) {
+  //     throw err;
+  //   }
+  //   Message = root.lookupType("gossip.NPOIMessage");
+  // });
 
   // Initial queries
-  const allocations = await fetchAllocations(client, indexerAddress);
+  const allocations = await fetchAllocations(gatewayclient, indexerAddress);
   const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
-  const poiMessageValues = (subgraph:string, nPOI:string) => {return {
-    subgraph,
-    nPOI,
-  }}
+  const poiMessageValues = (subgraph: string, nPOI: string) => {
+    return {
+      subgraph,
+      nPOI,
+    };
+  };
   console.log(
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
       .green,
@@ -83,32 +93,40 @@ const run = async () => {
     }
   );
 
-  const poi_handler = async (msg: Uint8Array) => {
+  const poiHandler = async (msg: Uint8Array) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
-    try{
+    try {
       // temporarily removed self check for easy testing
       console.info(
         `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-      const attestation:Attestation = await observer.prepareAttestation(Message, msg, domain, types, poiMessageValues, provider, radioFilter, registryClient)
-      storeAttestations(nPOIs, attestation)
-      return nPOIs
+      const attestation: Attestation = await prepareAttestation(
+        msg,
+        domain,
+        types,
+        poiMessageValues,
+        provider,
+        radioFilter,
+        registryClient
+      );
+      storeAttestations(nPOIs, attestation);
+      return nPOIs;
     } catch {
-      console.error(`Failed to handle a message into attestments, moving on`)
+      console.error(`Failed to handle a message into attestments, moving on`);
     }
   };
 
-  observer.observe(topics, poi_handler);
+  observer.observe(topics, poiHandler);
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
     const blockObject = await provider.getBlock(block);
     const unavailableDplymts = [];
-    
-    DeploymentIpfses.forEach(async ipfsHash => {
+
+    DeploymentIpfses.forEach(async (ipfsHash) => {
       const localPOI = await fetchPOI(
         graphClient,
         ipfsHash,
@@ -121,25 +139,29 @@ const run = async () => {
         //Q: If the agent doesn't find a ipfshash, it probably makes sense to setCostModel as well
         // However this handling makes more sense to be in the agent
         unavailableDplymts.push(ipfsHash);
-        return
-      }      
+        return;
+      }
       const blocks = localnPOIs.get(ipfsHash) ?? new Map();
       blocks.set(block.toString(), localPOI);
       localnPOIs.set(ipfsHash, blocks);
 
-      const rawMessage = {
+      const payload = {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
 
-      const encodedMessage = await messenger.writeMessage(ethClient, Message, rawMessage, domain, types, blockObject)
+      console.log(`:outbox_tray: Wrote and encoded message, sending`.green);
 
-      console.log(`:outbox_tray: Wrote and encoded message, sending`.green)
+      // Move all of the sending into one function that we pass the payload to
       await messenger.sendMessage(
-        encodedMessage,
+        ethClient,
+        payload,
+        domain,
+        types,
+        blockObject,
         `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
       );
-    })
+    });
 
     if (unavailableDplymts.length > 0) {
       console.log(
@@ -167,20 +189,24 @@ const run = async () => {
         });
       }
 
-      const divergedDeployments = processAttestations(localnPOIs, nPOIs, (block - 8).toString())
-      if (divergedDeployments){
-        console.log(
-          `⚠️ Handle POI divergences to avoid query traffic`
-            .red,
-          { divergedDeployments, defaultModel }
-        );
-        divergedDeployments.map(deployment => 
+      const divergedDeployments = processAttestations(
+        localnPOIs,
+        nPOIs,
+        (block - 8).toString()
+      );
+      if (divergedDeployments) {
+        console.log(`⚠️ Handle POI divergences to avoid query traffic`.red, {
+          divergedDeployments,
+          defaultModel,
+        });
+        divergedDeployments.map((deployment) =>
           //TODO: add response handling
           updateCostModel(indexerClient, {
             deployment,
             model: defaultModel,
             variables: null,
-          }));
+          })
+        );
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
