@@ -5,9 +5,10 @@ export class EthClient {
   provider: JsonRpcProvider;
   wallet: Wallet;
 
-  constructor() {
-    const provider = new ethers.providers.JsonRpcProvider(
-      `http://${process.env.ETH_NODE}`
+  constructor() {    
+    const provider = new ethers.providers.InfuraProvider(
+      `goerli`,
+      process.env.INFURA_API_KEY
     );
     this.provider = provider;
 

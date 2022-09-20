@@ -100,7 +100,7 @@ const run = async () => {
     try {
       // temporarily removed self check for easy testing
       console.info(
-        `\n📮 A new message has been received! Parse, validate, and store\n`
+        `\n📮 A new message has been received! Parse, validate, and store...\n`
           .green
       );
       const attestation: Attestation = await prepareAttestation(
@@ -150,7 +150,7 @@ const run = async () => {
         nPOI: localPOI,
       };
 
-      console.log(`:outbox_tray: Wrote and encoded message, sending`.green);
+      console.log(`📬 Wrote and encoded message, sending`.green);
 
       // Move all of the sending into one function that we pass the payload to
       await messenger.sendMessage(

@@ -26,7 +26,7 @@ export class Messenger {
     );
 
     const rawMessage = {
-      content: content,
+      ...content,
       nonce: Date.now(),
       blockNumber: block.number,
       blockHash: block.hash,
@@ -35,17 +35,16 @@ export class Messenger {
     console.log("✍️ Signing... " + signature);
 
     let protoMessage;
-    protobuf.load("./proto/NPOIMessage.proto", async (err, root) => {
+    protobuf.load("/usr/app/dist/src/proto/NPOIMessage.proto", async (err, root) => {
       if (err) {
         throw err;
       }
       protoMessage = root.lookupType("gossip.NPOIMessage");
+
+      const encodedMessage = protoMessage.encode(rawMessage).finish();
+      const msg = await WakuMessage.fromBytes(encodedMessage, topic);
+
+      await this.wakuInstance.relay.send(msg);
     });
-
-    const encodedMessage = protoMessage.encode(rawMessage).finish();
-    const msg = await WakuMessage.fromBytes(encodedMessage, topic);
-
-    await this.wakuInstance.relay.send(msg);
-
   }
 }
