@@ -1,4 +1,4 @@
-import { NPOIMessage } from "./examples/poi-crosschecker/poi-helpers";
+import { NPOIMessage } from "./examples/poi-crosschecker/utils";
 import { Waku, WakuMessage } from "js-waku";
 import { ClientManager } from "./ethClient";
 import { BlockPointer } from "./radio-common/types";
@@ -25,7 +25,7 @@ export class Messenger {
     block: BlockPointer
   ) {
     try {
-      const signature = await this.clientManager.ethNode.wallet._signTypedData(
+      const signature = await this.clientManager.ethClient.wallet._signTypedData(
         messageTyping.domain,
         messageTyping.types,
         rawMessage

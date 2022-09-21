@@ -3,15 +3,41 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import { Client, createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
 
+// Move to sdk level types
+type EthConstructorArgs = {
+  operatorPrivateKey: string;
+  ethNodeUrl?: string;
+  infuraApiKey?: string;
+  network?: string;
+};
+
 export class EthClient {
   provider: JsonRpcProvider;
   wallet: Wallet;
 
-  constructor(api: string, private_key: string) {
-    const provider = new ethers.providers.JsonRpcProvider(api);
+  constructor(args: EthConstructorArgs) {
+    const { ethNodeUrl, operatorPrivateKey, infuraApiKey, network } = args;
+
+    let provider: JsonRpcProvider;
+
+    // TODO: Error handling
+    if (ethNodeUrl !== null && ethNodeUrl !== undefined) {
+      provider = new ethers.providers.JsonRpcProvider(ethNodeUrl);
+    } else if (
+      infuraApiKey !== null &&
+      infuraApiKey !== undefined &&
+      network !== undefined &&
+      network !== undefined
+    ) {
+      provider = new ethers.providers.InfuraProvider(
+        network,
+        process.env.INFURA_API_KEY
+      );
+    }
+
     this.provider = provider;
 
-    const wallet = new Wallet(private_key);
+    const wallet = new Wallet(operatorPrivateKey);
     this.wallet = wallet.connect(provider);
   }
 
@@ -35,23 +61,44 @@ export class EthClient {
   }
 }
 
+// TODO: Move to sdk level types
+type ClientManagerArgs = {
+  ethNodeUrl?: string;
+  operatorPrivateKey: string;
+  graphNetworkUrl: string;
+  infuraApiKey?: string;
+  infuraNetwork?: string;
+  registry: string;
+  graphNodeStatus: string;
+  indexerManagementServer: string;
+};
+
 export class ClientManager {
-  ethNode: EthClient;
+  ethClient: EthClient;
   networkSubgraph: Client;
   graphNodeStatus: Client;
   indexerManagement: Client;
   registry: Client;
 
-  constructor(
-    eth_node: string,
-    privateKey: string,
-    networkUrl: string,
-    graphNodeStatus: string,
-    indexerManagementServer: string,
-    registry: string
-  ) {
-    this.ethNode = new EthClient(eth_node, privateKey);
-    this.networkSubgraph = createClient({ url: networkUrl, fetch });
+  constructor(args: ClientManagerArgs) {
+    const {
+      ethNodeUrl,
+      operatorPrivateKey,
+      graphNetworkUrl,
+      infuraApiKey,
+      infuraNetwork,
+      registry,
+      graphNodeStatus,
+      indexerManagementServer,
+    } = args;
+
+    this.ethClient = new EthClient({
+      ethNodeUrl: ethNodeUrl || null,
+      operatorPrivateKey,
+      infuraApiKey: infuraApiKey || null,
+      network: infuraNetwork || null,
+    });
+    this.networkSubgraph = createClient({ url: graphNetworkUrl, fetch });
     this.graphNodeStatus = createClient({
       url: graphNodeStatus,
       fetch,

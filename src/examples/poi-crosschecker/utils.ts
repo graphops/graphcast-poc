@@ -1,6 +1,9 @@
 import bs58 from "bs58";
 import "colors";
 import * as protobuf from "protobufjs/light";
+import { ethers } from "ethers";
+import { Observer } from "../../observer";
+import { BlockPointer } from "../../radio-common/types";
 
 // POI topic configs, can probably be moved into POI message class
 export type Attestation = {
@@ -21,7 +24,7 @@ export function processAttestations(localnPOIs, nPOIs, targetBlock) {
       !nPOIs.get(subgraphDeployment).has(targetBlock)
     ) {
       console.debug(
-        `No attestations for $(subgraphDeployment) on block ${targetBlock} at the moment`
+        `No attestations for ${subgraphDeployment} on block ${targetBlock} at the moment`
       );
       return [];
     }
@@ -166,7 +169,7 @@ export class NPOIMessage {
   get nPOI(): string {
     return this.payload.nPOI;
   }
-  
+
   //todo: auto-generate with types
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public static messageValues(subgraph: string, nPOI: string): any {
@@ -176,3 +179,121 @@ export class NPOIMessage {
     };
   }
 }
+
+export const prepareAttestation = async (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  message: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  MessageType: any,
+  observer: Observer
+): Promise<Attestation> => {
+  //TODO: extract subgraph and nPOI based on provided typing
+  const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } = message;
+  const value = MessageType.messageValues(subgraph, nPOI);
+  const hash = ethers.utils._TypedDataEncoder.hash(
+    MessageType.domain,
+    MessageType.types,
+    value
+  );
+  const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
+
+  // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
+  const block = await observer.clientManager.ethClient.buildBlock(
+    Number(blockNumber)
+  );
+
+  const stake = await poiMsgValidity(
+    observer,
+    sender,
+    subgraph,
+    Number(nonce),
+    blockHash,
+    block
+  );
+  if (stake <= 0) {
+    return;
+  }
+
+  console.info(
+    `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
+      .green
+  );
+
+  // can be built outside or using types
+  const attestation: Attestation = {
+    nPOI,
+    deployment: subgraph,
+    blockNumber: Number(blockNumber),
+    indexerAddress: sender,
+    stake: BigInt(stake),
+  };
+
+  return attestation;
+};
+
+// TODO: Type arguments
+export const poiMsgValidity = async (
+  observer: Observer,
+  sender: string,
+  deployment: string,
+  nonce: number,
+  blockHash: string,
+  block: BlockPointer
+) => {
+  // Resolve signer to indexer identity and check stake and dispute statuses
+  const indexerAddress = await observer.radioFilter.isOperatorOf(
+    observer.clientManager.registry,
+    sender
+  );
+  
+  if (!indexerAddress) {
+    console.warn(`👮 Sender not an operator, drop message`.red, { sender });
+    return 0;
+  }
+
+  const senderStake = await observer.radioFilter.indexerCheck(
+    observer.clientManager.registry,
+    indexerAddress
+  );
+
+  const tokensSlashed = await observer.radioFilter.disputeStatusCheck(
+    observer.clientManager.registry,
+    indexerAddress
+  );
+
+  if (senderStake == 0 || tokensSlashed > 0) {
+    console.warn(
+      `👮 Indexer identity failed stake requirement or has been slashed, drop message`
+        .red,
+      {
+        senderStake,
+        tokensSlashed,
+      }
+    );
+    return 0;
+  }
+
+  // Message param checks
+  if (await observer.radioFilter.replayCheck(nonce, blockHash, block)) {
+    console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
+      nonce,
+      blockHash,
+      queriedBlock: block.hash,
+    });
+    return 0;
+  }
+
+  if (observer.radioFilter.inconsistentNonce(sender, deployment, nonce)) {
+    console.warn(
+      `👮 Inconsistent nonce or first time sender, drop message`.red,
+      {
+        sender,
+        deployment,
+        nonce,
+      }
+    );
+    return 0;
+  }
+
+  return senderStake;
+};

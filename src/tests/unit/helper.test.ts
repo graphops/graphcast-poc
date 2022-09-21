@@ -1,37 +1,36 @@
 import { ClientManager } from "../../ethClient";
 import { Messenger } from "../../messenger";
-import { NPOIMessage } from "../../examples/poi-crosschecker/poi-helpers";
+import {
+  NPOIMessage,
+  prepareAttestation,
+} from "../../examples/poi-crosschecker/utils";
 import { Observer } from "../../observer";
-
-declare const ETH_NODE: string;
-declare const RADIO_OPERATOR_PRIVATE_KEY: string;
-declare const NETWORK_URL: string;
-declare const GRAPH_NODE_HOST: string;
-declare const INDEXER_MANAGEMENT_SERVER: string;
-declare const REGISTRY_SUBGRAPH: string;
 
 let messenger: Messenger;
 let observer: Observer;
-let block: { number: number; hash: string; };
+let block: { number: number; hash: string };
 let clientManager: ClientManager;
-let rawMessage_okay: { nPOI: string; subgraph: string; };
+let rawMessage_okay: { nPOI: string; subgraph: string };
 const setup = async () => {
-  jest.spyOn(console, 'log').mockImplementation(jest.fn());
-  jest.spyOn(console, 'warn').mockImplementation(jest.fn());
-  jest.spyOn(console, 'error').mockImplementation(jest.fn());
-  jest.spyOn(console, 'info').mockImplementation(jest.fn());
-  jest.spyOn(console, 'debug').mockImplementation(jest.fn());
+  jest.spyOn(console, "log").mockImplementation(jest.fn());
+  jest.spyOn(console, "warn").mockImplementation(jest.fn());
+  jest.spyOn(console, "error").mockImplementation(jest.fn());
+  jest.spyOn(console, "info").mockImplementation(jest.fn());
+  jest.spyOn(console, "debug").mockImplementation(jest.fn());
 
   messenger = new Messenger();
   observer = new Observer();
-  clientManager = new ClientManager(
-    `http://${ETH_NODE}`,
-    RADIO_OPERATOR_PRIVATE_KEY,
-    NETWORK_URL,
-    `http://${GRAPH_NODE_HOST}:8030/graphql`,
-    `http://${INDEXER_MANAGEMENT_SERVER}`,
-    REGISTRY_SUBGRAPH
-  );
+
+  // TODO: Change back to eth node when Basilisk is healthy
+  clientManager = new ClientManager({
+    operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
+    infuraApiKey: process.env.INFURA_API_KEY,
+    infuraNetwork: "goerli",
+    registry: process.env.REGISTRY_SUBGRAPH,
+    graphNodeStatus: `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
+    indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
+    graphNetworkUrl: process.env.NETWORK_URL,
+  });
 
   await messenger.init(clientManager);
   await observer.init(clientManager);
@@ -42,7 +41,7 @@ const setup = async () => {
     number: 1,
     hash: "0x0001",
   };
-  observer.clientManager.ethNode.buildBlock = jest.fn(async (number) => {
+  observer.clientManager.ethClient.buildBlock = jest.fn(async (number) => {
     return {
       number: number,
       hash: "0x000" + number,
@@ -90,11 +89,13 @@ describe("Messenger and Observer helpers", () => {
         rawMessage_okay,
         block
       );
-      expect(observer.readMessage(encodedMessage, "NPOIMessage")).toBeUndefined();
+      expect(
+        observer.readMessage(encodedMessage, "NPOIMessage")
+      ).toBeUndefined();
     });
 
     test("Gossip agent registry check", async () => {
-      const operatorAddress = clientManager.ethNode.getAddress().toLowerCase();
+      const operatorAddress = clientManager.ethClient.getAddress().toLowerCase();
       const indexerAddress = await observer.radioFilter.isOperatorOf(
         observer.clientManager.registry,
         operatorAddress
@@ -111,9 +112,10 @@ describe("Messenger and Observer helpers", () => {
       );
       // first message always fails
       await expect(
-        observer.prepareAttestation(
+        prepareAttestation(
           observer.readMessage(encodedMessage, NPOIMessage),
-          NPOIMessage
+          NPOIMessage,
+          observer
         )
       ).resolves.toBeUndefined();
 
@@ -125,9 +127,10 @@ describe("Messenger and Observer helpers", () => {
         block
       );
       await expect(
-        observer.prepareAttestation(
+        prepareAttestation(
+          NPOIMessage,
           observer.readMessage(encodedMessage2, NPOIMessage),
-          NPOIMessage
+          observer
         )
       ).resolves.toBeDefined();
 
@@ -139,9 +142,10 @@ describe("Messenger and Observer helpers", () => {
         block
       );
       expect(
-        observer.prepareAttestation(
+        prepareAttestation(
+          NPOIMessage,
           observer.readMessage(encodedMessage3, NPOIMessage),
-          NPOIMessage
+          observer
         )
       ).resolves.toBeUndefined();
     });
