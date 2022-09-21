@@ -54,13 +54,9 @@ export default class RadioFilter {
 
   // Message timestamp from within the past hour and match with block
   public async replayCheck(
-    
     timestamp: number,
-   
-    blockHash:  string,
-   
+    blockHash: string,
     block: BlockPointer
-  Pointer
   ) {
     const messageAge = new Date().getTime() - timestamp;
     return (

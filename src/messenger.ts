@@ -35,15 +35,13 @@ export class Messenger {
 
       console.log("✍️ Signing... " + signature);
 
-      const message = new GraphcastMessage(
-        {
-          radioPayload: JSON.stringify(radioPayload),
-          nonce: Date.now(),
-          blockNumber: block.number,
-          blockHash: block.hash,
-          signature: signature,
-        },
-      );
+      const message = new GraphcastMessage({
+        radioPayload: JSON.stringify(radioPayload),
+        nonce: Date.now(),
+        blockNumber: block.number,
+        blockHash: block.hash,
+        signature: signature,
+      });
 
       const encodedMessage = message.encode();
 
