@@ -70,7 +70,7 @@ const run = async () => {
     }
   );
 
-  const poi_handler = async (msg: Uint8Array) => {
+  const poi_poi_handler = async async (msg: Uint8Array) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
@@ -102,7 +102,7 @@ const run = async () => {
     }
   };
 
-  observer.observe(topics, poi_handler);
+  observer.observe(topics, poi_poi_handler);
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {

@@ -20,6 +20,9 @@ export class Observer {
 
     this.radioFilter = new RadioFilter();
     this.clientManager = clients;
+
+    this.radioFilter = new RadioFilter();
+    this.clientManager = clients;
   }
 
   observe(topics: string[], handler: (msg: Uint8Array) => void): void {
