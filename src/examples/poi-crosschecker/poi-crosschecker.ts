@@ -3,19 +3,15 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { ClientManager } from "../../ethClient";
-import {
-  fetchAllocations,
-  fetchPOI,
-  updateCostModel,
-} from "./queries";
+import { GraphcastMessage } from "../../graphcastMessage";
+import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
 import {
   Attestation,
   defaultModel,
   printNPOIs,
   processAttestations,
   storeAttestations,
-  NPOIMessage,
-  prepareAttestation
+  prepareAttestation,
 } from "./utils";
 
 const run = async () => {
@@ -84,12 +80,21 @@ const run = async () => {
         `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-      const message = observer.readMessage(msg, NPOIMessage);
+      const message = observer.readMessage(msg, GraphcastMessage, [
+        { name: "subgraph", type: "string" },
+        { name: "nPOI", type: "string" },
+      ]);
+
       const attestation: Attestation = await prepareAttestation(
         message,
-        NPOIMessage,
-        observer
+        GraphcastMessage,
+        observer,
+        [
+          { name: "subgraph", type: "string" },
+          { name: "nPOI", type: "string" },
+        ]
       );
+
       storeAttestations(nPOIs, attestation);
       return nPOIs;
     } catch {
@@ -123,14 +128,17 @@ const run = async () => {
       blocks.set(block.toString(), localPOI);
       localnPOIs.set(ipfsHash, blocks);
 
-      const rawMessage = {
+      const radioPayload = {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
 
       const encodedMessage = await messenger.writeMessage(
-        NPOIMessage,
-        rawMessage,
+        radioPayload,
+        [
+          { name: "subgraph", type: "string" },
+          { name: "nPOI", type: "string" },
+        ],
         blockObject
       );
 

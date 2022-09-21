@@ -1,4 +1,4 @@
-import { NPOIMessage } from "./examples/poi-crosschecker/utils";
+import { GraphcastMessage } from "./graphcastMessage";
 import { Waku, WakuMessage } from "js-waku";
 import { ClientManager } from "./ethClient";
 import { BlockPointer } from "./radio-common/types";
@@ -13,36 +13,40 @@ export class Messenger {
       },
     });
 
-    // await waku.waitForRemotePeer();
+    // TODO: Shoul we remove or keep this?
+    await waku.waitForRemotePeer();
     this.wakuInstance = waku;
     this.clientManager = clients;
   }
 
   async writeMessage(
-    messageTyping: typeof NPOIMessage,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    rawMessage: any,
+    radioPayload: any,
+    types: { name: string; type: string }[],
     block: BlockPointer
   ) {
     try {
-      const signature = await this.clientManager.ethClient.wallet._signTypedData(
-        messageTyping.domain,
-        messageTyping.types,
-        rawMessage
-      );
+      const signature =
+        await this.clientManager.ethClient.wallet._signTypedData(
+          GraphcastMessage.domain,
+          { GraphcastMessage: types },
+          radioPayload
+        );
 
       console.log("✍️ Signing... " + signature);
-      //TODO: abstract NPOIMessage
-      const message = new messageTyping({
-        subgraph: rawMessage.subgraph,
-        nPOI: rawMessage.nPOI,
-        nonce: Date.now(),
-        blockNumber: block.number,
-        blockHash: block.hash,
-        signature: signature,
-      });
+
+      const message = new GraphcastMessage(
+        {
+          radioPayload: JSON.stringify(radioPayload),
+          nonce: Date.now(),
+          blockNumber: block.number,
+          blockHash: block.hash,
+          signature: signature,
+        },
+      );
 
       const encodedMessage = message.encode();
+
       return encodedMessage;
     } catch (error) {
       throw Error(

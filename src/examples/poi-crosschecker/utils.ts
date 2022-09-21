@@ -1,6 +1,5 @@
 import bs58 from "bs58";
 import "colors";
-import * as protobuf from "protobufjs/light";
 import { ethers } from "ethers";
 import { Observer } from "../../observer";
 import { BlockPointer } from "../../radio-common/types";
@@ -109,92 +108,28 @@ export const storeAttestations = (nPOIs, attestation) => {
   }
 };
 
-const Root = protobuf.Root,
-  Type = protobuf.Type,
-  Field = protobuf.Field;
-
-//Abstract the message to 3 layers
-export interface NPOIMessagePayload {
-  subgraph: string;
-  nPOI: string;
-  nonce: number;
-  blockNumber: number;
-  blockHash: string;
-  signature: string;
-}
-
-export class NPOIMessage {
-  private static Type = new Type("NPOIMessage")
-    .add(new Field("subgraph", 1, "string"))
-    .add(new Field("nPOI", 2, "string"))
-    // These can be removed or factored to a general message type
-    .add(new Field("nonce", 3, "int64"))
-    .add(new Field("blockNumber", 4, "int64"))
-    .add(new Field("blockHash", 5, "string"))
-    .add(new Field("signature", 6, "string"));
-
-  private static Root = new Root().define("gossip").add(NPOIMessage.Type);
-  public static domain = {
-    name: `graphcast-poi-crosschecker`,
-    version: "0",
-  };
-  public static types = {
-    NPOIMessage: [
-      { name: "subgraph", type: "string" },
-      { name: "nPOI", type: "string" },
-    ],
-  };
-
-  constructor(public payload: NPOIMessagePayload) {}
-
-  public encode(): Uint8Array {
-    const message = NPOIMessage.Type.create(this.payload);
-    return NPOIMessage.Type.encode(message).finish();
-  }
-
-  public static decode(bytes: Uint8Array | Buffer): NPOIMessage | undefined {
-    const payload = NPOIMessage.Type.decode(
-      bytes
-    ) as unknown as NPOIMessagePayload;
-    if (!payload.subgraph || !payload.nPOI) {
-      console.log(
-        "Field (subgraph and nPOI) missing on decoded NPOIMessage",
-        payload
-      );
-      return;
-    }
-    return new NPOIMessage(payload);
-  }
-
-  get nPOI(): string {
-    return this.payload.nPOI;
-  }
-
-  //todo: auto-generate with types
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public static messageValues(subgraph: string, nPOI: string): any {
-    return {
-      subgraph,
-      nPOI,
-    };
-  }
-}
-
 export const prepareAttestation = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   message: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   MessageType: any,
-  observer: Observer
+  observer: Observer,
+  types: {
+    name: string;
+    type: string;
+  }[]
 ): Promise<Attestation> => {
   //TODO: extract subgraph and nPOI based on provided typing
-  const { subgraph, nPOI, nonce, blockNumber, blockHash, signature } = message;
-  const value = MessageType.messageValues(subgraph, nPOI);
+  const { radioPayload, nonce, blockNumber, blockHash, signature } = message;
+  const { subgraph, nPOI } = JSON.parse(radioPayload);
+
+  // Extrac these to the SDK level
   const hash = ethers.utils._TypedDataEncoder.hash(
     MessageType.domain,
-    MessageType.types,
-    value
+    { GraphcastMessage: types },
+    JSON.parse(radioPayload)
   );
+
   const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
   // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
@@ -231,7 +166,6 @@ export const prepareAttestation = async (
   return attestation;
 };
 
-// TODO: Type arguments
 export const poiMsgValidity = async (
   observer: Observer,
   sender: string,
@@ -245,7 +179,7 @@ export const poiMsgValidity = async (
     observer.clientManager.registry,
     sender
   );
-  
+
   if (!indexerAddress) {
     console.warn(`👮 Sender not an operator, drop message`.red, { sender });
     return 0;

@@ -29,9 +29,17 @@ export class Observer {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readMessage(msg: Uint8Array, MessageType: any) {
+  readMessage(
+    msg: Uint8Array,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MessageType: any,
+    radioPayloadTypes: Array<{
+      name: string;
+      type: string;
+    }>
+  ) {
     try {
-      return MessageType.decode(msg).payload;
+      return MessageType.decode(msg, radioPayloadTypes).payload;
     } catch (error) {
       console.error(`Protobuf could not decode message, check formatting`);
       return;
