@@ -17,8 +17,7 @@ import {
 const run = async () => {
   const clientManager = new ClientManager({
     operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
-    infuraApiKey: process.env.INFURA_API_KEY,
-    infuraNetwork: "goerli",
+    ethNodeUrl: process.env.ETH_NODE,
     registry: process.env.REGISTRY_SUBGRAPH,
     graphNodeStatus: `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
     indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,

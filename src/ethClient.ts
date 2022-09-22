@@ -3,41 +3,15 @@ import { JsonRpcProvider } from "@ethersproject/providers";
 import { Client, createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
 
-// Move to sdk level types
-type EthConstructorArgs = {
-  operatorPrivateKey: string;
-  ethNodeUrl?: string;
-  infuraApiKey?: string;
-  network?: string;
-};
-
 export class EthClient {
   provider: JsonRpcProvider;
   wallet: Wallet;
 
-  constructor(args: EthConstructorArgs) {
-    const { ethNodeUrl, operatorPrivateKey, infuraApiKey, network } = args;
-
-    let provider: JsonRpcProvider;
-
-    // TODO: Error handling
-    if (ethNodeUrl !== null && ethNodeUrl !== undefined) {
-      provider = new ethers.providers.JsonRpcProvider(ethNodeUrl);
-    } else if (
-      infuraApiKey !== null &&
-      infuraApiKey !== undefined &&
-      network !== undefined &&
-      network !== undefined
-    ) {
-      provider = new ethers.providers.InfuraProvider(
-        network,
-        process.env.INFURA_API_KEY
-      );
-    }
-
+  constructor(url: string, private_key: string) {
+    const provider = new ethers.providers.JsonRpcProvider(url);
     this.provider = provider;
 
-    const wallet = new Wallet(operatorPrivateKey);
+    const wallet = new Wallet(private_key);
     this.wallet = wallet.connect(provider);
   }
 
@@ -85,19 +59,12 @@ export class ClientManager {
       ethNodeUrl,
       operatorPrivateKey,
       graphNetworkUrl,
-      infuraApiKey,
-      infuraNetwork,
       registry,
       graphNodeStatus,
       indexerManagementServer,
     } = args;
 
-    this.ethClient = new EthClient({
-      ethNodeUrl: ethNodeUrl || null,
-      operatorPrivateKey,
-      infuraApiKey: infuraApiKey || null,
-      network: infuraNetwork || null,
-    });
+    this.ethClient = new EthClient(ethNodeUrl, operatorPrivateKey);
     this.networkSubgraph = createClient({ url: graphNetworkUrl, fetch });
     this.graphNodeStatus = createClient({
       url: graphNodeStatus,

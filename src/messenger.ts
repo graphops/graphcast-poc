@@ -13,8 +13,6 @@ export class Messenger {
       },
     });
 
-    // TODO: Shoul we remove or keep this?
-    await waku.waitForRemotePeer();
     this.wakuInstance = waku;
     this.clientManager = clients;
   }

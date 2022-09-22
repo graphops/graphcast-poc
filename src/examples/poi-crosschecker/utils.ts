@@ -2,7 +2,6 @@ import bs58 from "bs58";
 import "colors";
 import { ethers } from "ethers";
 import { Observer } from "../../observer";
-import { BlockPointer } from "../../radio-common/types";
 
 // POI topic configs, can probably be moved into POI message class
 export type Attestation = {
@@ -108,6 +107,7 @@ export const storeAttestations = (nPOIs, attestation) => {
   }
 };
 
+// TODO: Break this up a bit and move the general part back to observer and the specific parts can stay here
 export const prepareAttestation = async (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   message: any,
@@ -137,8 +137,8 @@ export const prepareAttestation = async (
     Number(blockNumber)
   );
 
-  const stake = await poiMsgValidity(
-    observer,
+  const stake = await observer.radioFilter.messageValidity(
+    observer.clientManager.registry,
     sender,
     subgraph,
     Number(nonce),
@@ -164,70 +164,4 @@ export const prepareAttestation = async (
   };
 
   return attestation;
-};
-
-export const poiMsgValidity = async (
-  observer: Observer,
-  sender: string,
-  deployment: string,
-  nonce: number,
-  blockHash: string,
-  block: BlockPointer
-) => {
-  // Resolve signer to indexer identity and check stake and dispute statuses
-  const indexerAddress = await observer.radioFilter.isOperatorOf(
-    observer.clientManager.registry,
-    sender
-  );
-
-  if (!indexerAddress) {
-    console.warn(`👮 Sender not an operator, drop message`.red, { sender });
-    return 0;
-  }
-
-  const senderStake = await observer.radioFilter.indexerCheck(
-    observer.clientManager.registry,
-    indexerAddress
-  );
-
-  const tokensSlashed = await observer.radioFilter.disputeStatusCheck(
-    observer.clientManager.registry,
-    indexerAddress
-  );
-
-  if (senderStake == 0 || tokensSlashed > 0) {
-    console.warn(
-      `👮 Indexer identity failed stake requirement or has been slashed, drop message`
-        .red,
-      {
-        senderStake,
-        tokensSlashed,
-      }
-    );
-    return 0;
-  }
-
-  // Message param checks
-  if (await observer.radioFilter.replayCheck(nonce, blockHash, block)) {
-    console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
-      nonce,
-      blockHash,
-      queriedBlock: block.hash,
-    });
-    return 0;
-  }
-
-  if (observer.radioFilter.inconsistentNonce(sender, deployment, nonce)) {
-    console.warn(
-      `👮 Inconsistent nonce or first time sender, drop message`.red,
-      {
-        sender,
-        deployment,
-        nonce,
-      }
-    );
-    return 0;
-  }
-
-  return senderStake;
 };
