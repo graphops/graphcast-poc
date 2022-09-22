@@ -1,7 +1,7 @@
 import { GraphcastMessage } from "./graphcastMessage";
 import { Waku, WakuMessage } from "js-waku";
 import { ClientManager } from "./ethClient";
-import { BlockPointer } from "./radio-common/types";
+import { BlockPointer } from "./types";
 export class Messenger {
   wakuInstance: Waku;
   clientManager: ClientManager;
@@ -40,7 +40,7 @@ export class Messenger {
         blockHash: block.hash,
         signature: signature,
       });
-
+      
       const encodedMessage = message.encode();
 
       return encodedMessage;

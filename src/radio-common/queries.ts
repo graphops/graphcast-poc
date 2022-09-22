@@ -1,7 +1,7 @@
 import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
 import "colors";
-import { Dispute } from "./types";
+import { Dispute } from "../types";
 
 export const operatorOfIndexerQuery = gql`
   query gossipOperatorOf($address: String!) {

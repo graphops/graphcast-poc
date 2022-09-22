@@ -32,8 +32,7 @@ export class GraphcastMessage {
   }
 
   public static decode(
-    bytes: Uint8Array | Buffer,
-    types: { name: string; type: string }[]
+    bytes: Uint8Array | Buffer
   ): GraphcastMessage | undefined {
     const payload = GraphcastMessage.Type.decode(
       bytes

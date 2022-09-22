@@ -2,6 +2,7 @@ import { ethers, utils, Wallet } from "ethers";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { Client, createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
+import { ClientManagerArgs } from "./types";
 
 export class EthClient {
   provider: JsonRpcProvider;
@@ -34,18 +35,6 @@ export class EthClient {
     return publicKey;
   }
 }
-
-// TODO: Move to sdk level types
-type ClientManagerArgs = {
-  ethNodeUrl?: string;
-  operatorPrivateKey: string;
-  graphNetworkUrl: string;
-  infuraApiKey?: string;
-  infuraNetwork?: string;
-  registry: string;
-  graphNodeStatus: string;
-  indexerManagementServer: string;
-};
 
 export class ClientManager {
   ethClient: EthClient;

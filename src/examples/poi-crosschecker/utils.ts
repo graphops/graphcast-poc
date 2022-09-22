@@ -1,7 +1,5 @@
 import bs58 from "bs58";
 import "colors";
-import { ethers } from "ethers";
-import { Observer } from "../../observer";
 
 // POI topic configs, can probably be moved into POI message class
 export type Attestation = {
@@ -105,63 +103,4 @@ export const storeAttestations = (nPOIs, attestation) => {
   } else {
     nPOIs.set(deployment, new Map([[blockNum, [attestation]]]));
   }
-};
-
-// TODO: Break this up a bit and move the general part back to observer and the specific parts can stay here
-export const prepareAttestation = async (
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  message: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  MessageType: any,
-  observer: Observer,
-  types: {
-    name: string;
-    type: string;
-  }[]
-): Promise<Attestation> => {
-  //TODO: extract subgraph and nPOI based on provided typing
-  const { radioPayload, nonce, blockNumber, blockHash, signature } = message;
-  const { subgraph, nPOI } = JSON.parse(radioPayload);
-
-  // Extrac these to the SDK level
-  const hash = ethers.utils._TypedDataEncoder.hash(
-    MessageType.domain,
-    { GraphcastMessage: types },
-    JSON.parse(radioPayload)
-  );
-
-  const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
-
-  // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
-  const block = await observer.clientManager.ethClient.buildBlock(
-    Number(blockNumber)
-  );
-
-  const stake = await observer.radioFilter.messageValidity(
-    observer.clientManager.registry,
-    sender,
-    subgraph,
-    Number(nonce),
-    blockHash,
-    block
-  );
-  if (stake <= 0) {
-    return;
-  }
-
-  console.info(
-    `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}\nSubgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`
-      .green
-  );
-
-  // can be built outside or using types
-  const attestation: Attestation = {
-    nPOI,
-    deployment: subgraph,
-    blockNumber: Number(blockNumber),
-    indexerAddress: sender,
-    stake: BigInt(stake),
-  };
-
-  return attestation;
 };

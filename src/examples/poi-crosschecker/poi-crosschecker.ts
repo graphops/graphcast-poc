@@ -3,7 +3,6 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { ClientManager } from "../../ethClient";
-import { GraphcastMessage } from "../../graphcastMessage";
 import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
 import {
   Attestation,
@@ -11,7 +10,6 @@ import {
   printNPOIs,
   processAttestations,
   storeAttestations,
-  prepareAttestation,
 } from "./utils";
 
 const run = async () => {
@@ -69,7 +67,7 @@ const run = async () => {
     }
   );
 
-  const poiHandler = async (msg: Uint8Array) => {
+  const poiHandler = async (msg: Uint8Array, topic: string) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
@@ -79,20 +77,29 @@ const run = async () => {
         `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-      const message = observer.readMessage(msg, GraphcastMessage, [
-        { name: "subgraph", type: "string" },
-        { name: "nPOI", type: "string" },
-      ]);
-
-      const attestation: Attestation = await prepareAttestation(
-        message,
-        GraphcastMessage,
-        observer,
-        [
+      const message = await observer.readMessage({
+        msg,
+        topic,
+        types: [
           { name: "subgraph", type: "string" },
           { name: "nPOI", type: "string" },
-        ]
+        ],
+      });
+
+      const { radioPayload, blockNumber, sender, stake } = message;
+      const { nPOI, subgraph } = JSON.parse(radioPayload);
+
+      console.info(
+        `Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`.green
       );
+
+      const attestation: Attestation = {
+        nPOI: nPOI,
+        deployment: subgraph,
+        blockNumber: Number(blockNumber),
+        indexerAddress: sender,
+        stake: BigInt(stake),
+      };
 
       storeAttestations(nPOIs, attestation);
       return nPOIs;
