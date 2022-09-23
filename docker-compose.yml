@@ -1,23 +1,34 @@
 version: "3.8"
 
 services:
-  poi-crosschecker:
-    container_name: good-folk-1
+  good-indexer:
     build:
       context: .
       dockerfile: ./Dockerfile
-    command: echo 'running' | ls
+    command: node poi-crosschecker.js
+    env_file:
+      - .env
     environment:
-      ETH_NODE: host.docker.internal:8545
-      GRAPH_NODE_HOST: host.docker.internal
-      INDEXER_MANAGERMENT_SERVER: host.docker.internal:18000
-      RADIO_OPERATOR_PRIVATE_KEY: 806ccd0301ec455bfc94c71c9d199de4ce8838717a15da0a57a5d2cdc717bb5c
-    networks:
-      default:
-    # user: ${CURRENT_UID:?"Please run as follows 'CURRENT_UID=$(id -u):$(id -g) docker-compose up'"}
-    volume:
-      - .:/dist/src/examples/poi-crosschecker
-      - poi_crosschecker_node_modules:/src/examples/poi-crosschecker/node_modules
+      - GRAPH_NODE=host.docker.internal:8030
 
-volumes:
-  poi_crosschecker_node_modules:
+  wiremock:
+    image: wiremock/wiremock
+    command:
+      - '--enable-browser-proxying=true'
+    container_name: wiremock
+    volumes:
+      - ./src/tests/integration:/home/wiremock/
+    ports:
+      - 8031:8080
+
+  bad-indexer:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    links:
+      - wiremock
+    command: node poi-crosschecker.js
+    env_file:
+      - a.env
+    environment:
+      - GRAPH_NODE=host.docker.internal:8031/mock

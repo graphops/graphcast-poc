@@ -16,10 +16,6 @@ export class EthClient {
     this.wallet = wallet.connect(provider);
   }
 
-  async getBlockNumber(): Promise<number> {
-    return await this.provider.getBlockNumber();
-  }
-
   async getEthBalance(): Promise<number> {
     const balance = await this.wallet.getBalance();
     return parseFloat(utils.formatEther(balance));
