@@ -3,29 +3,29 @@ import "dotenv/config";
 import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { ClientManager } from "../../ethClient";
-import {
-  fetchAllocations,
-  fetchPOI,
-  updateCostModel,
-} from "../../radio-common/queries";
+import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
 import {
   Attestation,
   defaultModel,
   printNPOIs,
   processAttestations,
   storeAttestations,
-  NPOIMessage,
-} from "./poi-helpers";
+} from "./utils";
+
+const RADIO_PAYLOAD_TYPES = [
+  { name: "subgraph", type: "string" },
+  { name: "nPOI", type: "string" },
+];
 
 const run = async () => {
-  const clientManager = new ClientManager(
-    `http://${process.env.ETH_NODE}`,
-    process.env.RADIO_OPERATOR_PRIVATE_KEY,
-    process.env.NETWORK_URL,
-    `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
-    `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
-    process.env.REGISTRY_SUBGRAPH
-  );
+  const clientManager = new ClientManager({
+    operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
+    ethNodeUrl: process.env.ETH_NODE,
+    registry: process.env.REGISTRY_SUBGRAPH,
+    graphNodeStatus: `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
+    indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
+    graphNetworkUrl: process.env.NETWORK_URL,
+  });
 
   const observer = new Observer();
   const messenger = new Messenger();
@@ -33,12 +33,12 @@ const run = async () => {
   await observer.init(clientManager);
   await messenger.init(clientManager);
 
-  const operatorAddress = clientManager.ethNode.getAddress().toLowerCase();
+  const operatorAddress = clientManager.ethClient.getAddress().toLowerCase();
 
   const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
   const localnPOIs: Map<string, Map<string, string>> = new Map();
 
-  const ethBalance = await clientManager.ethNode.getEthBalance();
+  const ethBalance = await clientManager.ethClient.getEthBalance();
   const indexerAddress = await observer.radioFilter.isOperatorOf(
     observer.clientManager.registry,
     operatorAddress
@@ -48,7 +48,7 @@ const run = async () => {
     "🔦 Radio operator resolved to indexer address - " + indexerAddress,
     {
       operatorEthBalance: ethBalance,
-      operatorPublicKey: clientManager.ethNode.wallet.publicKey,
+      operatorPublicKey: clientManager.ethClient.wallet.publicKey,
     }
   );
 
@@ -72,7 +72,7 @@ const run = async () => {
     }
   );
 
-  const poi_handler = async (msg: Uint8Array) => {
+  const poiHandler = async (msg: Uint8Array, topic: string) => {
     printNPOIs(nPOIs);
     console.log("👀 My nPOIs:".blue, { localnPOIs });
 
@@ -82,23 +82,39 @@ const run = async () => {
         `\n📮 A new message has been received! Parse, validate, and store\n`
           .green
       );
-      const message = observer.readMessage(msg, NPOIMessage);
-      const attestation: Attestation = await observer.prepareAttestation(
-        message,
-        NPOIMessage
+      const message = await observer.readMessage({
+        msg,
+        topic,
+        types: RADIO_PAYLOAD_TYPES,
+      });
+
+      const { radioPayload, blockNumber, sender, stakeWeight } = message;
+      const { nPOI, subgraph } = JSON.parse(radioPayload);
+
+      console.info(
+        `Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`.green
       );
+
+      const attestation: Attestation = {
+        nPOI: nPOI,
+        deployment: subgraph,
+        blockNumber: Number(blockNumber),
+        indexerAddress: sender,
+        stakeWeight: BigInt(stakeWeight),
+      };
+
       storeAttestations(nPOIs, attestation);
       return nPOIs;
     } catch {
-      console.error(`Failed to handle a message into attestments, moving on`);
+      console.error(`Failed to handle a message into attestation, moving on`);
     }
   };
 
-  observer.observe(topics, poi_handler);
+  observer.observe(topics, poiHandler);
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
-    const blockObject = await clientManager.ethNode.provider.getBlock(block);
+    const blockObject = await clientManager.ethClient.provider.getBlock(block);
     const unavailableDplymts = [];
 
     DeploymentIpfses.forEach(async (ipfsHash) => {
@@ -120,18 +136,18 @@ const run = async () => {
       blocks.set(block.toString(), localPOI);
       localnPOIs.set(ipfsHash, blocks);
 
-      const rawMessage = {
+      const radioPayload = {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
 
-      const encodedMessage = await messenger.writeMessage(
-        NPOIMessage,
-        rawMessage,
-        blockObject
-      );
+      const encodedMessage = await messenger.writeMessage({
+        radioPayload,
+        types: RADIO_PAYLOAD_TYPES,
+        block: blockObject,
+      });
 
-      console.log(`:outbox_tray: Wrote and encoded message, sending`.green);
+      console.log(`📬 Wrote and encoded message, sending`.green);
       await messenger.sendMessage(
         encodedMessage,
         `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
@@ -148,7 +164,7 @@ const run = async () => {
   };
 
   let compareBlock = 0;
-  clientManager.ethNode.provider.on("block", async (block) => {
+  clientManager.ethClient.provider.on("block", async (block) => {
     console.log(`🔗 ${block}`);
 
     if (block % 5 === 0) {
@@ -169,7 +185,7 @@ const run = async () => {
         nPOIs,
         (block - 8).toString()
       );
-      if (divergedDeployments) {
+      if (divergedDeployments.length > 0) {
         console.log(`⚠️ Handle POI divergences to avoid query traffic`.red, {
           divergedDeployments,
           defaultModel,

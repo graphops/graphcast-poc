@@ -1,6 +1,5 @@
 import bs58 from "bs58";
 import "colors";
-import * as protobuf from "protobufjs/light";
 
 // POI topic configs, can probably be moved into POI message class
 export type Attestation = {
@@ -8,7 +7,7 @@ export type Attestation = {
   deployment: string;
   blockNumber: number;
   indexerAddress: string;
-  stake: bigint;
+  stakeWeight: bigint;
 };
 
 export const defaultModel = "default => 100000;";
@@ -21,7 +20,7 @@ export function processAttestations(localnPOIs, nPOIs, targetBlock) {
       !nPOIs.get(subgraphDeployment).has(targetBlock)
     ) {
       console.debug(
-        `No attestations for $(subgraphDeployment) on block ${targetBlock} at the moment`
+        `No attestations for ${subgraphDeployment} on block ${targetBlock} at the moment`
       );
       return [];
     }
@@ -71,7 +70,7 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
       console.log(`🔍  Attestations for block ${block}:`.cyan);
       attestations.forEach((a) => {
         console.log(
-          `nPOI: ${a.nPOI}\nSender: ${a.indexerAddress}\nStake:${a.stake}\n`
+          `nPOI: ${a.nPOI}\nSender: ${a.indexerAddress}\nStake:${a.stakeWeight}\n`
             .cyan
         );
       });
@@ -81,9 +80,9 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
 
 export const sortAttestations = (attestations: Attestation[]) =>
   attestations.sort((a, b) => {
-    if (a.stake < b.stake) {
+    if (a.stakeWeight < b.stakeWeight) {
       return 1;
-    } else if (a.stake > b.stake) {
+    } else if (a.stakeWeight > b.stakeWeight) {
       return -1;
     } else {
       return 0;
@@ -105,74 +104,3 @@ export const storeAttestations = (nPOIs, attestation) => {
     nPOIs.set(deployment, new Map([[blockNum, [attestation]]]));
   }
 };
-
-const Root = protobuf.Root,
-  Type = protobuf.Type,
-  Field = protobuf.Field;
-
-//Abstract the message to 3 layers
-export interface NPOIMessagePayload {
-  subgraph: string;
-  nPOI: string;
-  nonce: number;
-  blockNumber: number;
-  blockHash: string;
-  signature: string;
-}
-
-export class NPOIMessage {
-  private static Type = new Type("NPOIMessage")
-    .add(new Field("subgraph", 1, "string"))
-    .add(new Field("nPOI", 2, "string"))
-    // These can be removed or factored to a general message type
-    .add(new Field("nonce", 3, "int64"))
-    .add(new Field("blockNumber", 4, "int64"))
-    .add(new Field("blockHash", 5, "string"))
-    .add(new Field("signature", 6, "string"));
-
-  private static Root = new Root().define("gossip").add(NPOIMessage.Type);
-  public static domain = {
-    name: `graphcast-poi-crosschecker`,
-    version: "0",
-  };
-  public static types = {
-    NPOIMessage: [
-      { name: "subgraph", type: "string" },
-      { name: "nPOI", type: "string" },
-    ],
-  };
-
-  constructor(public payload: NPOIMessagePayload) {}
-
-  public encode(): Uint8Array {
-    const message = NPOIMessage.Type.create(this.payload);
-    return NPOIMessage.Type.encode(message).finish();
-  }
-
-  public static decode(bytes: Uint8Array | Buffer): NPOIMessage | undefined {
-    const payload = NPOIMessage.Type.decode(
-      bytes
-    ) as unknown as NPOIMessagePayload;
-    if (!payload.subgraph || !payload.nPOI) {
-      console.log(
-        "Field (subgraph and nPOI) missing on decoded NPOIMessage",
-        payload
-      );
-      return;
-    }
-    return new NPOIMessage(payload);
-  }
-
-  get nPOI(): string {
-    return this.payload.nPOI;
-  }
-  
-  //todo: auto-generate with types
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public static messageValues(subgraph: string, nPOI: string): any {
-    return {
-      subgraph,
-      nPOI,
-    };
-  }
-}

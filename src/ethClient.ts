@@ -2,13 +2,14 @@ import { ethers, utils, Wallet } from "ethers";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { Client, createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
+import { ClientManagerArgs } from "./types";
 
 export class EthClient {
   provider: JsonRpcProvider;
   wallet: Wallet;
 
-  constructor(api: string, private_key: string) {
-    const provider = new ethers.providers.JsonRpcProvider(api);
+  constructor(url: string, private_key: string) {
+    const provider = new ethers.providers.JsonRpcProvider(url);
     this.provider = provider;
 
     const wallet = new Wallet(private_key);
@@ -36,22 +37,24 @@ export class EthClient {
 }
 
 export class ClientManager {
-  ethNode: EthClient;
+  ethClient: EthClient;
   networkSubgraph: Client;
   graphNodeStatus: Client;
   indexerManagement: Client;
   registry: Client;
 
-  constructor(
-    eth_node: string,
-    privateKey: string,
-    networkUrl: string,
-    graphNodeStatus: string,
-    indexerManagementServer: string,
-    registry: string
-  ) {
-    this.ethNode = new EthClient(eth_node, privateKey);
-    this.networkSubgraph = createClient({ url: networkUrl, fetch });
+  constructor(args: ClientManagerArgs) {
+    const {
+      ethNodeUrl,
+      operatorPrivateKey,
+      graphNetworkUrl,
+      registry,
+      graphNodeStatus,
+      indexerManagementServer,
+    } = args;
+
+    this.ethClient = new EthClient(ethNodeUrl, operatorPrivateKey);
+    this.networkSubgraph = createClient({ url: graphNetworkUrl, fetch });
     this.graphNodeStatus = createClient({
       url: graphNodeStatus,
       fetch,

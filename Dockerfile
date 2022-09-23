@@ -7,7 +7,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-WORKDIR ./dist/src/examples/poi-crosschecker
+WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 
 ENV GRAPH_NODE_HOST "host.docker.internal"
 ENV ETH_NODE "host.docker.internal:8545"

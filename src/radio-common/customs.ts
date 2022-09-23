@@ -5,7 +5,7 @@ import {
   fetchStake,
   fetchOperatorOfIndexers,
 } from "./queries";
-import { BlockPointer } from "./types";
+import { BlockPointer, MessageValidityArgs } from "../types";
 
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
@@ -35,6 +35,7 @@ export default class RadioFilter {
 
   public async indexerCheck(client: Client, address: string) {
     const senderStake = await fetchStake(client, address);
+
     if (!this.minStakeReq) {
       this.setRequirement(client);
     }
@@ -65,17 +66,17 @@ export default class RadioFilter {
     );
   }
 
-  public inconsistentNonce(sender: string, deployment: string, nonce: number) {
+  public inconsistentNonce(sender: string, topic: string, nonce: number) {
     // check message nonce from local states for consistency
     if (!(sender in this.nonceDirectory)) {
-      this.nonceDirectory[sender] = { [deployment]: nonce };
+      this.nonceDirectory[sender] = { [topic]: nonce };
       return true;
-    } else if (!(deployment in this.nonceDirectory[sender])) {
-      this.nonceDirectory[sender][deployment] = nonce;
+    } else if (!(topic in this.nonceDirectory[sender])) {
+      this.nonceDirectory[sender][topic] = nonce;
       return true;
     }
 
-    const prevNonce: number = this.nonceDirectory[sender][deployment];
+    const prevNonce: number = this.nonceDirectory[sender][topic];
 
     return prevNonce >= nonce;
   }
@@ -89,14 +90,9 @@ export default class RadioFilter {
     );
   }
 
-  public async poiMsgValidity(
-    client: Client,
-    sender: string,
-    deployment: string,
-    nonce: number,
-    blockHash: string,
-    block: BlockPointer
-  ) {
+  public async messageValidity(args: MessageValidityArgs) {
+    const { client, sender, topic, nonce, blockHash, block } = args;
+
     // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(client, sender);
     if (!indexerAddress) {
@@ -127,12 +123,12 @@ export default class RadioFilter {
       });
       return 0;
     }
-    if (this.inconsistentNonce(sender, deployment, nonce)) {
+    if (this.inconsistentNonce(sender, topic, nonce)) {
       console.warn(
         `👮 Inconsistent nonce or first time sender, drop message`.red,
         {
           sender,
-          deployment,
+          topic,
           nonce,
         }
       );
