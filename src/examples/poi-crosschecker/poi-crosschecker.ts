@@ -12,6 +12,11 @@ import {
   storeAttestations,
 } from "./utils";
 
+const RADIO_PAYLOAD_TYPES = [
+  { name: "subgraph", type: "string" },
+  { name: "nPOI", type: "string" },
+];
+
 const run = async () => {
   const clientManager = new ClientManager({
     operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
@@ -80,13 +85,10 @@ const run = async () => {
       const message = await observer.readMessage({
         msg,
         topic,
-        types: [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
+        types: RADIO_PAYLOAD_TYPES,
       });
 
-      const { radioPayload, blockNumber, sender, stake } = message;
+      const { radioPayload, blockNumber, sender, stakeWeight } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
       console.info(
@@ -98,7 +100,7 @@ const run = async () => {
         deployment: subgraph,
         blockNumber: Number(blockNumber),
         indexerAddress: sender,
-        stake: BigInt(stake),
+        stakeWeight: BigInt(stakeWeight),
       };
 
       storeAttestations(nPOIs, attestation);
@@ -139,14 +141,11 @@ const run = async () => {
         nPOI: localPOI,
       };
 
-      const encodedMessage = await messenger.writeMessage(
+      const encodedMessage = await messenger.writeMessage({
         radioPayload,
-        [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
-        blockObject
-      );
+        types: RADIO_PAYLOAD_TYPES,
+        block: blockObject,
+      });
 
       console.log(`📬 Wrote and encoded message, sending`.green);
       await messenger.sendMessage(

@@ -7,7 +7,7 @@ export type Attestation = {
   deployment: string;
   blockNumber: number;
   indexerAddress: string;
-  stake: bigint;
+  stakeWeight: bigint;
 };
 
 export const defaultModel = "default => 100000;";
@@ -70,7 +70,7 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
       console.log(`🔍  Attestations for block ${block}:`.cyan);
       attestations.forEach((a) => {
         console.log(
-          `nPOI: ${a.nPOI}\nSender: ${a.indexerAddress}\nStake:${a.stake}\n`
+          `nPOI: ${a.nPOI}\nSender: ${a.indexerAddress}\nStake:${a.stakeWeight}\n`
             .cyan
         );
       });
@@ -80,9 +80,9 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
 
 export const sortAttestations = (attestations: Attestation[]) =>
   attestations.sort((a, b) => {
-    if (a.stake < b.stake) {
+    if (a.stakeWeight < b.stakeWeight) {
       return 1;
-    } else if (a.stake > b.stake) {
+    } else if (a.stakeWeight > b.stakeWeight) {
       return -1;
     } else {
       return 0;

@@ -14,6 +14,11 @@ let observer: Observer;
 let block: { number: number; hash: string };
 let clientManager: ClientManager;
 let rawMessage_okay: { nPOI: string; subgraph: string };
+let types: Array<{
+  name: string;
+  type: string;
+}>;
+
 const setup = async () => {
   jest.spyOn(console, "log").mockImplementation(jest.fn());
   jest.spyOn(console, "warn").mockImplementation(jest.fn());
@@ -53,26 +58,25 @@ const setup = async () => {
     subgraph: "Qmaaa",
     nPOI: "poi0",
   };
+
+  types = [
+    { name: "subgraph", type: "string" },
+    { name: "nPOI", type: "string" },
+  ];
 };
 
 describe("Messenger and Observer helpers", () => {
   beforeAll(setup);
   describe("Write and Observe", () => {
     test("write and observe a message - success", async () => {
-      const encodedMessage = await messenger.writeMessage(
-        rawMessage_okay,
-        [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
-        block
-      );
+      const encodedMessage = await messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
       expect(encodedMessage).toBeDefined();
 
-      const message = observer._decodeMessage(encodedMessage, [
-        { name: "subgraph", type: "string" },
-        { name: "nPOI", type: "string" },
-      ]);
+      const message = observer._decodeMessage(encodedMessage, types);
 
       expect(message).toBeDefined();
       expect(Number(message.blockNumber)).toEqual(block.number);
@@ -87,14 +91,11 @@ describe("Messenger and Observer helpers", () => {
       };
       await expect(
         async () =>
-          await messenger.writeMessage(
-            rawMessage_bad,
-            [
-              { name: "subgraph", type: "string" },
-              { name: "nPOI", type: "string" },
-            ],
-            block
-          )
+          await messenger.writeMessage({
+            radioPayload: rawMessage_bad,
+            types,
+            block,
+          })
       ).rejects.toThrowError(
         `Cannot write and encode the message, check formatting`
       );
@@ -113,65 +114,47 @@ describe("Messenger and Observer helpers", () => {
 
     // // test the observer
     test("Observer prepare attestations", async () => {
-      const encodedMessage = await messenger.writeMessage(
-        rawMessage_okay,
-        [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
-        block
-      );
+      const encodedMessage = await messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
       // first message always fails
       expect(
         await observer.readMessage({
           msg: encodedMessage,
           topic: "topic",
-          types: [
-            { name: "subgraph", type: "string" },
-            { name: "nPOI", type: "string" },
-          ],
+          types,
         })
       ).toBeUndefined();
 
       // later message with a higher nonce...
       Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
-      const encodedMessage2 = await messenger.writeMessage(
-        rawMessage_okay,
-        [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
-        block
-      );
+      const encodedMessage2 = await messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
       expect(
         await observer.readMessage({
           msg: encodedMessage2,
           topic: "topic",
-          types: [
-            { name: "subgraph", type: "string" },
-            { name: "nPOI", type: "string" },
-          ],
+          types,
         })
       ).toBeDefined();
 
       // tries to inject to the past
       Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
-      const encodedMessage3 = await messenger.writeMessage(
-        rawMessage_okay,
-        [
-          { name: "subgraph", type: "string" },
-          { name: "nPOI", type: "string" },
-        ],
-        block
-      );
+      const encodedMessage3 = await messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
       expect(
         await observer.readMessage({
           msg: encodedMessage3,
           topic: "topic",
-          types: [
-            { name: "subgraph", type: "string" },
-            { name: "nPOI", type: "string" },
-          ],
+          types,
         })
       ).toBeUndefined();
     });

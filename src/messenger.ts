@@ -1,7 +1,7 @@
 import { GraphcastMessage } from "./graphcastMessage";
 import { Waku, WakuMessage } from "js-waku";
 import { ClientManager } from "./ethClient";
-import { BlockPointer } from "./types";
+import { WriteMessageArgs } from "./types";
 export class Messenger {
   wakuInstance: Waku;
   clientManager: ClientManager;
@@ -17,12 +17,9 @@ export class Messenger {
     this.clientManager = clients;
   }
 
-  async writeMessage(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    radioPayload: any,
-    types: { name: string; type: string }[],
-    block: BlockPointer
-  ) {
+  async writeMessage(args: WriteMessageArgs) {
+    const { radioPayload, types, block } = args;
+
     try {
       const signature =
         await this.clientManager.ethClient.wallet._signTypedData(
@@ -40,7 +37,7 @@ export class Messenger {
         blockHash: block.hash,
         signature: signature,
       });
-      
+
       const encodedMessage = message.encode();
 
       return encodedMessage;

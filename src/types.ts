@@ -1,5 +1,7 @@
 import { Client } from "@urql/core";
 
+export type BlockPointer = { number: number; hash: string };
+
 export type RadioMessage = {
   payload: Uint8Array;
   topic: string;
@@ -8,6 +10,16 @@ export type RadioMessage = {
 export type ReadMessageArgs = {
   msg: Uint8Array;
   topic: string;
+  types: Array<{
+    name: string;
+    type: string;
+  }>;
+};
+
+export type WriteMessageArgs = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  radioPayload: any;
+  block: BlockPointer;
   types: Array<{
     name: string;
     type: string;
@@ -43,5 +55,3 @@ export type Dispute = {
   status: string;
   tokensSlashed: bigint;
 };
-
-export type BlockPointer = { number: number; hash: string };

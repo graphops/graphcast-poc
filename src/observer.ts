@@ -62,12 +62,11 @@ export class Observer {
 
       const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
-      // Message Validity (check registry identity, time, stake, dispute) for which to skip by returning early
       const block = await this.clientManager.ethClient.buildBlock(
         Number(blockNumber)
       );
 
-      const stake = await this.radioFilter.messageValidity({
+      const stakeWeight = await this.radioFilter.messageValidity({
         client: this.clientManager.registry,
         sender,
         topic,
@@ -75,7 +74,7 @@ export class Observer {
         blockHash,
         block,
       });
-      if (stake <= 0) {
+      if (stakeWeight <= 0) {
         return;
       }
 
@@ -88,7 +87,7 @@ export class Observer {
         radioPayload,
         blockNumber,
         sender,
-        stake,
+        stakeWeight,
       };
     } catch (error) {
       console.error(`Protobuf could not decode message, check formatting`);
