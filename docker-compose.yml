@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     environment:
-      - GRAPH_NODE=host.docker.internal:8030
+      - GRAPH_NODE=http://host.docker.internal:8030
 
   wiremock:
     image: wiremock/wiremock
@@ -31,4 +31,4 @@ services:
     env_file:
       - a.env
     environment:
-      - GRAPH_NODE=host.docker.internal:8031/mock
+      - GRAPH_NODE=http://host.docker.internal:8031/mock

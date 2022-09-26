@@ -80,26 +80,25 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
 };
 
 //TODO: modify attestation types
-export const sortAttestations = (attestations: Attestation[]) => {
+export const sortAttestations = (attestations: Attestation[])=> {
   const groups = [];
   attestations.forEach((attestation: Attestation) => {
-    groups[attestation.nPOI] = groups[attestation.nPOI]
-      ? {
-          nPOI: attestation.nPOI,
-          stakeWeight: groups[attestation.nPOI] + attestation.stakeWeight,
-          indexers: [
-            ...groups[attestation.nPOI].indexers,
-            attestation.indexerAddress,
-          ],
-        }
-      : {
-          nPOI: attestation.nPOI,
-          stakeWeight: attestation.stakeWeight,
-          indexers: [attestation.indexerAddress],
-        };
+    // if match with group's nPOI, update that group
+    const matchedGroup = groups.find(g => g.nPOI === attestation.nPOI)
+    if (matchedGroup){
+      matchedGroup.stakeWeight += attestation.stakeWeight
+      matchedGroup.indexers.push(attestation.indexerAddress)
+    }else{
+      groups.push({
+        nPOI: attestation.nPOI,
+        stakeWeight: attestation.stakeWeight,
+        indexers: [attestation.indexerAddress],
+      })
+    }
   });
 
-  return groups.sort((a, b) => Number(a.stakeWeight - b.stakeWeight));
+  const sorted = groups.sort((a, b) => Number(a.stakeWeight - b.stakeWeight))
+  return sorted;
 };
 
 export const storeAttestations = (nPOIs, attestation) => {

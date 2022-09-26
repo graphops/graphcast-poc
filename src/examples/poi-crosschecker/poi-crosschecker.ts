@@ -20,10 +20,10 @@ const RADIO_PAYLOAD_TYPES = [
 const run = async () => {
   const clientManager = new ClientManager({
     operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
-    ethNodeUrl: `http://${process.env.ETH_NODE}`,
+    ethNodeUrl: process.env.ETH_NODE,
     registry: process.env.REGISTRY_SUBGRAPH,
-    graphNodeStatus: `http://${process.env.GRAPH_NODE}/graphql`,
-    indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER_PORT}`,
+    graphNodeStatus: process.env.GRAPH_NODE,
+    indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER_PORT,
     graphNetworkUrl: process.env.NETWORK_URL,
   });
 
