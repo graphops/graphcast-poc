@@ -22,8 +22,8 @@ const run = async () => {
     operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
     ethNodeUrl: process.env.ETH_NODE,
     registry: process.env.REGISTRY_SUBGRAPH,
-    graphNodeStatus: `http://${process.env.GRAPH_NODE_HOST}:8030/graphql`,
-    indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER}`,
+    graphNodeStatus: `http://${process.env.GRAPH_NODE}/graphql`,
+    indexerManagementServer: `http://${process.env.INDEXER_MANAGEMENT_SERVER_PORT}`,
     graphNetworkUrl: process.env.NETWORK_URL,
   });
 
