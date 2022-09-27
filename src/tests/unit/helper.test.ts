@@ -30,11 +30,11 @@ const setup = async () => {
   observer = new Observer();
 
   clientManager = new ClientManager({
-    ethNodeUrl: `http://${ETH_NODE}`,
+    ethNodeUrl: ETH_NODE,
     operatorPrivateKey: RADIO_OPERATOR_PRIVATE_KEY,
     registry: REGISTRY_SUBGRAPH,
-    graphNodeStatus: `http://${GRAPH_NODE_HOST}:8030/graphql`,
-    indexerManagementServer: `http://${INDEXER_MANAGEMENT_SERVER}`,
+    graphNodeStatus: GRAPH_NODE_HOST,
+    indexerManagementServer: INDEXER_MANAGEMENT_SERVER,
     graphNetworkUrl: NETWORK_URL,
   });
 

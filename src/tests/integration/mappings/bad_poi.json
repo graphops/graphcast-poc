@@ -1,0 +1,14 @@
+{
+  "request": {
+    "url": "/mock/graphql"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "data": { "proofOfIndexing": "0x00000000101010101010101010101" }
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

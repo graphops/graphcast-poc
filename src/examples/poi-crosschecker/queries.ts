@@ -133,8 +133,7 @@ export async function fetchPOI(
     return result.data.proofOfIndexing;
   } catch {
     console.warn(
-      `⚠️ No POI fetched from the local graph-node for subgraph ${subgraph}.`
-        .yellow
+      `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`.yellow
     );
   }
 }

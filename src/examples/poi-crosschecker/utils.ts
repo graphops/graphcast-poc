@@ -34,6 +34,7 @@ export function processAttestations(localnPOIs, nPOIs, targetBlock) {
       block: targetBlock,
       attestations,
       mostStaked: topAttestation.nPOI,
+      indexerAddresses: topAttestation.indexers,
       localNPOI,
     });
 
@@ -78,16 +79,27 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
   });
 };
 
-export const sortAttestations = (attestations: Attestation[]) =>
-  attestations.sort((a, b) => {
-    if (a.stakeWeight < b.stakeWeight) {
-      return 1;
-    } else if (a.stakeWeight > b.stakeWeight) {
-      return -1;
-    } else {
-      return 0;
+//TODO: modify attestation types
+export const sortAttestations = (attestations: Attestation[])=> {
+  const groups = [];
+  attestations.forEach((attestation: Attestation) => {
+    // if match with group's nPOI, update that group
+    const matchedGroup = groups.find(g => g.nPOI === attestation.nPOI)
+    if (matchedGroup){
+      matchedGroup.stakeWeight += attestation.stakeWeight
+      matchedGroup.indexers.push(attestation.indexerAddress)
+    }else{
+      groups.push({
+        nPOI: attestation.nPOI,
+        stakeWeight: attestation.stakeWeight,
+        indexers: [attestation.indexerAddress],
+      })
     }
   });
+
+  const sorted = groups.sort((a, b) => Number(a.stakeWeight - b.stakeWeight))
+  return sorted;
+};
 
 export const storeAttestations = (nPOIs, attestation) => {
   const deployment = attestation.deployment;
