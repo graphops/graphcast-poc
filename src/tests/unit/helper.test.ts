@@ -4,7 +4,7 @@ import { Observer } from "../../observer";
 
 declare const ETH_NODE: string;
 declare const RADIO_OPERATOR_PRIVATE_KEY: string;
-declare const NETWORK_URL: string;
+declare const NETWORK_SUBGRAPH: string;
 declare const GRAPH_NODE_HOST: string;
 declare const INDEXER_MANAGEMENT_SERVER: string;
 declare const REGISTRY_SUBGRAPH: string;
@@ -35,7 +35,7 @@ const setup = async () => {
     registry: REGISTRY_SUBGRAPH,
     graphNodeStatus: GRAPH_NODE_HOST,
     indexerManagementServer: INDEXER_MANAGEMENT_SERVER,
-    graphNetworkUrl: NETWORK_URL,
+    graphNetworkUrl: NETWORK_SUBGRAPH,
   });
 
   await messenger.init(clientManager);

@@ -10,11 +10,11 @@ RUN npm run build
 WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 
 ENV REGISTRY_SUBGRAPH "https://api.thegraph.com/subgraphs/name/juanmardefago/gossip-network-subgraph"
-ENV NETWORK_URL "https://gateway.testnet.thegraph.com/network"
+ENV NETWORK_SUBGRAPH "https://gateway.testnet.thegraph.com/network"
 ENV TERM "xterm-256color"
 ENV GRAPH_NODE http://host.docker.internal:8030/graphql
-ENV ETH_NODE http://host.docker.internal:8545
+ENV ETH_NODE https://goerli.infura.io/v3/dc1a550f824a4c6aa428a3376f983145
 ENV INDEXER_MANAGEMENT_SERVER_PORT http://host.docker.internal:18000
-ENV RADIO_OPERATOR_PRIVATE_KEY "<RADIO_OPERATOR_PRIVATE_KEY>"
+ENV TEST_TOPIC QmeccoXogKyEBBewvfwK7D391XzdnkBkLmEboXE9cE9X8N
 
 CMD node poi-crosschecker.js

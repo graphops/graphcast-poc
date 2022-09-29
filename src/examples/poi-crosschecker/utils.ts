@@ -7,7 +7,7 @@ export type Attestation = {
   deployment: string;
   blockNumber: number;
   indexerAddress: string;
-  stakeWeight: bigint;
+  stakeWeight: number;
 };
 
 export const defaultModel = "default => 100000;";
@@ -79,25 +79,24 @@ export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
   });
 };
 
-//TODO: modify attestation types
-export const sortAttestations = (attestations: Attestation[])=> {
+export const sortAttestations = (attestations: Attestation[]) => {
   const groups = [];
   attestations.forEach((attestation: Attestation) => {
     // if match with group's nPOI, update that group
-    const matchedGroup = groups.find(g => g.nPOI === attestation.nPOI)
-    if (matchedGroup){
-      matchedGroup.stakeWeight += attestation.stakeWeight
-      matchedGroup.indexers.push(attestation.indexerAddress)
-    }else{
+    const matchedGroup = groups.find((g) => g.nPOI === attestation.nPOI);
+    if (matchedGroup) {
+      matchedGroup.stakeWeight += attestation.stakeWeight;
+      matchedGroup.indexers.push(attestation.indexerAddress);
+    } else {
       groups.push({
         nPOI: attestation.nPOI,
         stakeWeight: attestation.stakeWeight,
         indexers: [attestation.indexerAddress],
-      })
+      });
     }
   });
 
-  const sorted = groups.sort((a, b) => Number(a.stakeWeight - b.stakeWeight))
+  const sorted = groups.sort((a, b) => Number(b.stakeWeight - a.stakeWeight));
   return sorted;
 };
 
