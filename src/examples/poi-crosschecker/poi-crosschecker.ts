@@ -24,7 +24,7 @@ const run = async () => {
     registry: process.env.REGISTRY_SUBGRAPH,
     graphNodeStatus: process.env.GRAPH_NODE,
     indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER_PORT,
-    graphNetworkUrl: process.env.NETWORK_URL,
+    graphNetworkUrl: process.env.NETWORK_SUBGRAPH,
   });
 
   const observer = new Observer();
@@ -45,7 +45,7 @@ const run = async () => {
   );
 
   console.log(
-    "🔦 Radio operator resolved to indexer address - " + indexerAddress,
+    `🔦 Radio operator resolved to indexer address ${operatorAddress} -> ${indexerAddress}`,
     {
       operatorEthBalance: ethBalance,
       operatorPublicKey: clientManager.ethClient.wallet.publicKey,
@@ -53,11 +53,11 @@ const run = async () => {
   );
 
   // Initial queries
-  const allocations = await fetchAllocations(
-    clientManager.networkSubgraph,
-    indexerAddress
-  );
-  const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
+  const deploymentIPFSs =
+    [process.env.TEST_TOPIC] ??
+    (await fetchAllocations(clientManager.networkSubgraph, indexerAddress)).map(
+      (a) => a.subgraphDeployment.ipfsHash
+    );
   const topics = deploymentIPFSs.map(
     (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
@@ -79,8 +79,7 @@ const run = async () => {
     try {
       // temporarily removed self check for easy testing
       console.info(
-        `\n📮 A new message has been received! Parse, validate, and store\n`
-          .green
+        `\n📮 A new message has been received! Handling the message\n`.green
       );
       const message = await observer.readMessage({
         msg,
@@ -88,25 +87,33 @@ const run = async () => {
         types: RADIO_PAYLOAD_TYPES,
       });
 
+      //TODO: Need to fix radioPayload formatting - cannot destructure property right now
       const { radioPayload, blockNumber, sender, stakeWeight } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
+      const indexerAddress = await observer.radioFilter.isOperatorOf(
+        clientManager.registry,
+        sender
+      );
+
       console.info(
-        `Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`.green
+        `Payload: Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n`.green
       );
 
       const attestation: Attestation = {
         nPOI: nPOI,
         deployment: subgraph,
         blockNumber: Number(blockNumber),
-        indexerAddress: sender,
-        stakeWeight: BigInt(stakeWeight),
+        indexerAddress,
+        stakeWeight: Number(stakeWeight),
       };
 
       storeAttestations(nPOIs, attestation);
       return nPOIs;
-    } catch {
-      console.error(`Failed to handle a message into attestation, moving on`);
+    } catch (error) {
+      console.error(`Failed to handle a message into attestation, moving on`, {
+        error: error.message,
+      });
     }
   };
 

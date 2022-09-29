@@ -2,6 +2,7 @@ import { Client } from "@urql/core";
 import { gql } from "graphql-tag";
 import "colors";
 import { Dispute } from "../types";
+import { formatUnits } from "ethers/lib/utils";
 
 export const operatorOfIndexerQuery = gql`
   query gossipOperatorOf($address: String!) {
@@ -57,7 +58,10 @@ export async function fetchDisputes(
     }
     return result.data.disputes;
   } catch (error) {
-    console.warn(`No disputes fetched, assume nothing...?`);
+    console.warn(
+      `Failed to grab disputes, assume nothing (maybe assume something?)`,
+      { error: error.message }
+    );
     return [];
   }
 }
@@ -75,7 +79,7 @@ export async function fetchOperators(
     }
     return result.data.indexer.account.gossipOperators;
   } catch (error) {
-    console.warn(`No operators fetched, assume none`, { error });
+    console.warn(`No operators fetched, assume none`, { error: error.message });
     return [];
   }
 }
@@ -93,7 +97,8 @@ export async function fetchOperatorOfIndexers(client: Client, address: string) {
     });
   } catch (error) {
     console.warn(
-      `Did not find corresponding indexer address for the gossip operator`
+      `Did not find corresponding indexer address for the gossip operator`,
+      { error: error.message }
     );
     return null;
   }
@@ -107,9 +112,11 @@ export async function fetchStake(client: Client, address: string) {
     if (result.error) {
       throw result.error;
     }
-    return result.data.indexer.stakedTokens;
+    return Number(formatUnits(result.data.indexer.stakedTokens, 18));
   } catch (error) {
-    console.warn(`No stake fetched for indexer ${address}, assuming 0`);
+    console.warn(`No stake fetched for indexer ${address}, assuming 0`, {
+      error: error.message,
+    });
     return 0;
   }
 }
@@ -130,9 +137,13 @@ export async function fetchMinStake(client: Client) {
     if (result.error) {
       throw result.error;
     }
-    return result.data.graphNetwork.minimumIndexerStake;
+    return Number(
+      formatUnits(result.data.graphNetwork.minimumIndexerStake, 18)
+    );
   } catch (error) {
-    console.warn(`Failed to fetch minimum indexer stake requirement`);
+    console.warn(`Failed to fetch minimum indexer stake requirement`, {
+      error: error.message,
+    });
     return Number.POSITIVE_INFINITY;
   }
 }

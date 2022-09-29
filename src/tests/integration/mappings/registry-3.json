@@ -1,0 +1,28 @@
+{
+  "request": {
+    "url": "/mock-registry-subgraph",
+    "method": "POST",
+    "bodyPatterns": [
+      {
+        "equalToJson": "{\"query\":\"query gossipOperatorOf($address: String!) {\\n  graphAccount(id: $address) {\\n    id\\n    gossipOperatorOf {\\n      id\\n      __typename\\n    }\\n    __typename\\n  }\\n}\",\"operationName\":\"gossipOperatorOf\",\"variables\":{\"address\":\"0x3029675ef046f7c2a051b14d906d44e41231e784\"}}",
+        "ignoreArrayOrder": true,
+        "ignoreExtraElements": true
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "data": {
+        "graphAccount": {
+          "gossipOperatorOf": [
+            { "id": "0x0f758d28741f41702566d4ebd0b3e490ad7430cf" }
+          ]
+        }
+      }
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

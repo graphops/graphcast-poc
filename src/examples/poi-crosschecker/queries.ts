@@ -27,7 +27,9 @@ export async function fetchAllocations(client: Client, address: string) {
     }
     return result.data.indexer.allocations;
   } catch (error) {
-    console.warn(`No allocation fetched, check connection and address`);
+    console.warn(`No allocation fetched, check connection and address`, {
+      error: error.message,
+    });
     return [];
   }
 }
@@ -53,7 +55,7 @@ export const costModels = async (client: Client): Promise<CostModel[]> => {
     }
     return result.data.costModels;
   } catch (error) {
-    console.warn(`Failed to query costModels`, { error });
+    console.warn(`Failed to query costModels`, { error: error.message });
     return [];
   }
 };
@@ -79,10 +81,13 @@ export async function updateCostModel(client: Client, costModel: CostModel) {
       throw result.error;
     }
     return result.data.setCostModel;
-  } catch {
+  } catch (error) {
     console.warn(
-      `Failed to update cost model ${costModel} at indexer management server, skip for now`
-        .yellow
+      `Failed to update cost model for ${costModel.deployment} at indexer management server, skip for now`
+        .yellow,
+      {
+        error: error.message,
+      }
     );
   }
 }
@@ -131,9 +136,10 @@ export async function fetchPOI(
       throw result.error;
     }
     return result.data.proofOfIndexing;
-  } catch {
+  } catch (error) {
     console.warn(
-      `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`.yellow
+      `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`.yellow,
+      { error: error.message }
     );
   }
 }

@@ -27,7 +27,8 @@ export type WriteMessageArgs = {
 };
 
 export type MessageValidityArgs = {
-  client: Client;
+  registry: Client;
+  graphNetwork: Client;
   sender: string;
   topic: string;
   nonce: number;
@@ -47,11 +48,11 @@ export type ClientManagerArgs = {
 };
 
 export type IndexerStakeResponse = {
-  indexer: { Dispute: Dispute; stakedTokens: bigint };
+  indexer: { Dispute: Dispute; stakedTokens: number };
 };
 
 export type Dispute = {
   id: string;
   status: string;
-  tokensSlashed: bigint;
+  tokensSlashed: number;
 };

@@ -1,3 +1,4 @@
+import { formatUnits } from "ethers/lib/utils";
 import { Client } from "@urql/core";
 import {
   fetchDisputes,
@@ -85,23 +86,28 @@ export default class RadioFilter {
     const senderDisputes = await fetchDisputes(client, address);
     //Note: a more relaxed check is if there's dispute with Undecided status
     return senderDisputes.reduce(
-      (slashedRecord, dispute) => slashedRecord + Number(dispute.tokensSlashed),
+      (slashedRecord, dispute) =>
+        slashedRecord + Number(formatUnits(dispute.tokensSlashed, 18)),
       0
     );
   }
 
   public async messageValidity(args: MessageValidityArgs) {
-    const { client, sender, topic, nonce, blockHash, block } = args;
+    const { registry, graphNetwork, sender, topic, nonce, blockHash, block } =
+      args;
 
     // Resolve signer to indexer identity and check stake and dispute statuses
-    const indexerAddress = await this.isOperatorOf(client, sender);
+    const indexerAddress = await this.isOperatorOf(registry, sender);
     if (!indexerAddress) {
       console.warn(`👮 Sender not an operator, drop message`.red, { sender });
       return 0;
     }
 
-    const senderStake = await this.indexerCheck(client, indexerAddress);
-    const tokensSlashed = await this.disputeStatusCheck(client, indexerAddress);
+    const senderStake = await this.indexerCheck(graphNetwork, indexerAddress);
+    const tokensSlashed = await this.disputeStatusCheck(
+      graphNetwork,
+      indexerAddress
+    );
     if (senderStake == 0 || tokensSlashed > 0) {
       console.warn(
         `👮 Indexer identity failed stake requirement or has been slashed, drop message`

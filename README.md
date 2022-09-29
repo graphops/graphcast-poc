@@ -22,7 +22,7 @@ docker build -t poi-crosschecker . && docker run poi-crosschecker
 ```
 
 ## 🎚️ Configuring
-Currently the only way to change the base configuration of the Graphcast SDK is to change the environment variables in the `Dockerfile` - `INDEXER_ADDRESS`, `GRAPH_NODE_HOST`, `ETH_NODE` and `NETWORK_URL`. That should be enough in terms of flexibility for now.
+Currently the only way to change the base configuration of the Graphcast SDK is to change the environment variables in the `Dockerfile` - `INDEXER_ADDRESS`, `GRAPH_NODE_HOST`, `ETH_NODE` and `NETWORK_SUBGRAPH`. That should be enough in terms of flexibility for now.
 
 ## 🆕 Upgrading
 Updates to this POC will be merged into the `main` branch once their respective PR has been approved. The POC will not be distributed as a npm package or as releases on Github, since at this stage it is not recommended to be used in production.
