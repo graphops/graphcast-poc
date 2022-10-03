@@ -4,13 +4,19 @@ import { Observer } from "../../observer";
 import { Messenger } from "../../messenger";
 import { ClientManager } from "../../ethClient";
 import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
-import {
-  Attestation,
-  defaultModel,
-  printNPOIs,
-  processAttestations,
-  storeAttestations,
-} from "./utils";
+import { defaultModel, processAttestations } from "./utils";
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const sqlite3 = require("sqlite3").verbose();
+
+// TODO: Extract to types file
+export type NPOIRecord = {
+  subgraph: string;
+  block: number;
+  nPOI: string;
+  operator: string;
+  stakeWeight: bigint;
+};
 
 const RADIO_PAYLOAD_TYPES = [
   { name: "subgraph", type: "string" },
@@ -18,6 +24,23 @@ const RADIO_PAYLOAD_TYPES = [
 ];
 
 const run = async () => {
+  const db = new sqlite3.Database(
+    "/usr/app/poi_crosschecker.db",
+    sqlite3.OPEN_READWRITE,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any) => {
+      if (err) {
+        console.error(err.message);
+      } else {
+        console.log("Connected to the poi-crosschecker database.");
+      }
+    }
+  );
+
+  db.run(
+    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
+  );
+
   const clientManager = new ClientManager({
     operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
     ethNodeUrl: process.env.ETH_NODE,
@@ -34,9 +57,6 @@ const run = async () => {
   await messenger.init(clientManager);
 
   const operatorAddress = clientManager.ethClient.getAddress().toLowerCase();
-
-  const nPOIs: Map<string, Map<string, Attestation[]>> = new Map();
-  const localnPOIs: Map<string, Map<string, string>> = new Map();
 
   const ethBalance = await clientManager.ethClient.getEthBalance();
   const indexerAddress = await observer.radioFilter.isOperatorOf(
@@ -59,7 +79,7 @@ const run = async () => {
   );
   const deploymentIPFSs = allocations.map((a) => a.subgraphDeployment.ipfsHash);
   const topics = deploymentIPFSs.map(
-    (ipfsHash) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
+    (ipfsHash: string) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
   console.log(
     `\n👂 Initialize POI crosschecker for on-chain allocations with operator status:`
@@ -73,9 +93,6 @@ const run = async () => {
   );
 
   const poiHandler = async (msg: Uint8Array, topic: string) => {
-    printNPOIs(nPOIs);
-    console.log("👀 My nPOIs:".blue, { localnPOIs });
-
     try {
       // temporarily removed self check for easy testing
       console.info(
@@ -95,16 +112,11 @@ const run = async () => {
         `Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n\n`.green
       );
 
-      const attestation: Attestation = {
-        nPOI: nPOI,
-        deployment: subgraph,
-        blockNumber: Number(blockNumber),
-        indexerAddress: sender,
-        stakeWeight: BigInt(stakeWeight),
-      };
-
-      storeAttestations(nPOIs, attestation);
-      return nPOIs;
+      db.serialize(() => {
+        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight);
+        stmt.finalize();
+      });
     } catch {
       console.error(`Failed to handle a message into attestation, moving on`);
     }
@@ -132,9 +144,15 @@ const run = async () => {
         unavailableDplymts.push(ipfsHash);
         return;
       }
-      const blocks = localnPOIs.get(ipfsHash) ?? new Map();
-      blocks.set(block.toString(), localPOI);
-      localnPOIs.set(ipfsHash, blocks);
+
+      db.serialize(() => {
+        const stmt = db.prepare(
+          "INSERT INTO npois VALUES (?, ?, ?, ?, ?)"
+        );
+
+        stmt.run(ipfsHash, block.toString(), localPOI, operatorAddress, 0);
+        stmt.finalize();
+      });
 
       const radioPayload = {
         subgraph: ipfsHash,
@@ -174,16 +192,12 @@ const run = async () => {
     }
 
     if (block == compareBlock) {
-      if (localnPOIs.size > 0) {
-        console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue, {
-          localnPOIs,
-        });
-      }
+      console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue);
 
       const divergedDeployments = processAttestations(
-        localnPOIs,
-        nPOIs,
-        (block - 8).toString()
+        block - 8,
+        operatorAddress,
+        db
       );
       if (divergedDeployments.length > 0) {
         console.log(`⚠️ Handle POI divergences to avoid query traffic`.red, {
@@ -201,8 +215,7 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
-      nPOIs.clear();
-      localnPOIs.clear();
+      db.run("DELETE FROM npois");
     }
   });
 };
