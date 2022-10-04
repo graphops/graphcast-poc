@@ -9,15 +9,6 @@ import { defaultModel, processAttestations } from "./utils";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
 
-// TODO: Extract to types file
-export type NPOIRecord = {
-  subgraph: string;
-  block: number;
-  nPOI: string;
-  operator: string;
-  stakeWeight: bigint;
-};
-
 const RADIO_PAYLOAD_TYPES = [
   { name: "subgraph", type: "string" },
   { name: "nPOI", type: "string" },

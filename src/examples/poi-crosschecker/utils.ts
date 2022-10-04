@@ -1,6 +1,6 @@
 import bs58 from "bs58";
 import "colors";
-import { NPOIRecord } from "./poi-crosschecker";
+import { NPOIRecord } from "./types";
 
 export const defaultModel = "default => 100000;";
 
@@ -11,7 +11,6 @@ export const processAttestations = (
   db: any
 ) => {
   const divergedDeployments: string[] = [];
-  // TODO: Extract to function?
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
     "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM npois WHERE block = ?",
@@ -22,12 +21,9 @@ export const processAttestations = (
         console.log(`An error occurred: ${err.message}`);
       }
 
-      console.log("all");
-      console.log(rows);
-
       const localNPOIs = rows.filter((record) => record.operator === operator);
 
-      console.log("local");
+      console.log("🔎 Local nPOIs:");
       console.log(localNPOIs);
 
       if (localNPOIs.length > 0) {
@@ -39,7 +35,7 @@ export const processAttestations = (
             (record) => record.subgraph === subgraph
           );
 
-          console.log("remote");
+          console.log("🔎 Remote nPOIs:");
           console.log(remoteNPOIs);
 
           if (remoteNPOIs === undefined || remoteNPOIs.length === 0) {
