@@ -20,6 +20,9 @@ export const processAttestations = (
       if (err) {
         console.log(`An error occurred: ${err.message}`);
       }
+
+      console.log("🔎 All nPOIs:");
+      console.log(rows);
       
       const localNPOIs = rows.filter((record) => record.operator === operator);
 

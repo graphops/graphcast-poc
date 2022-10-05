@@ -78,7 +78,7 @@ const run = async () => {
     {
       indexerAddress:
         indexerAddress ??
-        "Graphcast agent is not registered as an indexer operator",
+        "Graphcast agent is not registered as an indexer operator", 
       topics,
     }
   );
