@@ -4,3 +4,4 @@ dist
 .envrc
 coverage
 *.sh
+.eslintcache
