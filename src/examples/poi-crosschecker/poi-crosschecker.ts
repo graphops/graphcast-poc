@@ -37,7 +37,7 @@ const run = async () => {
     ethNodeUrl: process.env.ETH_NODE,
     registry: process.env.REGISTRY_SUBGRAPH,
     graphNodeStatus: process.env.GRAPH_NODE,
-    indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER_PORT,
+    indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER,
     graphNetworkUrl: process.env.NETWORK_SUBGRAPH,
   });
 
