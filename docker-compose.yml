@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  good-indexer:
+  indexer-1:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     environment:
-      - GRAPH_NODE=http://host.docker.internal:8030/graphql
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
 
   wiremock:
     image: wiremock/wiremock
@@ -28,7 +28,79 @@ services:
     links:
       - wiremock
     command: node poi-crosschecker.js
-    env_file:
-      - a.env
     environment:
-      - GRAPH_NODE=http://host.docker.internal:8031/mock
+      - GRAPH_NODE=http://host.docker.internal:8031/mock-graph-node/graphql
+      - RADIO_OPERATOR_PRIVATE_KEY=b48865ce8ba26a8cdc2ece89869992fcac7771cd4766dab870a860b273f3d332
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-3:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=caf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-4:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=703d5cca4201a89415448922df75af8c111aad8b12911d6331802b71ace37491
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-5:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=e6246e05cf8c312877affb9977475f80247371d8632ffc7b80fa4afd5030ecb4
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-6:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=ebb0ee3369bc93268f74bb9933483700f91ed169873844687b8a4dfd4629a7c7
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-7:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=4025d593229ba51b11dbd24684c89b40983db2118f7d01f1c65d915ab79b61eb
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-8:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=0a4d42a52629a497b9687620f2c6d60ff50abe45451d3b03d9a24e35025ba9fa
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-9:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=3d3410737e99ed8bdc823d100730d7084f9bab936170de088e863dc5fc5fbb1e
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+
+  indexer-10:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    environment:
+      - RADIO_OPERATOR_PRIVATE_KEY=267f5f9c744273bc0ef065b9c9d3f3406f8de32725b50ee95f5ac736f0853e11
+      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph

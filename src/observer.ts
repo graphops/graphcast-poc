@@ -67,7 +67,8 @@ export class Observer {
       );
 
       const stakeWeight = await this.radioFilter.messageValidity({
-        client: this.clientManager.registry,
+        registry: this.clientManager.registry,
+        graphNetwork: this.clientManager.networkSubgraph,
         sender,
         topic,
         nonce: Number(nonce),
@@ -90,7 +91,9 @@ export class Observer {
         stakeWeight,
       };
     } catch (error) {
-      console.error(`Protobuf could not decode message, check formatting`);
+      console.error(`Observer could not read message`, {
+        error: error.message,
+      });
       return;
     }
   }
