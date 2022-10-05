@@ -20,7 +20,7 @@ export const processAttestations = (
       if (err) {
         console.log(`An error occurred: ${err.message}`);
       }
-
+      
       const localNPOIs = rows.filter((record) => record.operator === operator);
 
       console.log("🔎 Local nPOIs:");
@@ -34,9 +34,6 @@ export const processAttestations = (
           const remoteNPOIs = localNPOIs.filter(
             (record) => record.subgraph === subgraph
           );
-
-          console.log("🔎 Remote nPOIs:");
-          console.log(remoteNPOIs);
 
           if (remoteNPOIs === undefined || remoteNPOIs.length === 0) {
             console.debug(

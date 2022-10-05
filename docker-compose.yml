@@ -9,7 +9,7 @@ services:
     env_file:
       - .env
     environment:
-      - GRAPH_NODE=http://host.docker.internal:8030
+      - GRAPH_NODE=http://host.docker.internal:8030/graphql
 
   wiremock:
     image: wiremock/wiremock

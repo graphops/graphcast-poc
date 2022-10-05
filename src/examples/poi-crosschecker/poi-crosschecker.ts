@@ -105,11 +105,17 @@ const run = async () => {
 
       db.serialize(() => {
         const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight);
+        stmt.run(
+          subgraph,
+          blockNumber,
+          nPOI,
+          sender,
+          sender === operatorAddress ? 0 : stakeWeight
+        );
         stmt.finalize();
       });
     } catch {
-      console.error(`Failed to handle a message into attestation, moving on`);
+      console.error(`Failed to handle a message into attestation, moving on.`);
     }
   };
 
@@ -135,15 +141,6 @@ const run = async () => {
         unavailableDplymts.push(ipfsHash);
         return;
       }
-
-      db.serialize(() => {
-        const stmt = db.prepare(
-          "INSERT INTO npois VALUES (?, ?, ?, ?, ?)"
-        );
-
-        stmt.run(ipfsHash, block.toString(), localPOI, operatorAddress, 0);
-        stmt.finalize();
-      });
 
       const radioPayload = {
         subgraph: ipfsHash,
