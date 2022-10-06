@@ -1,117 +1,104 @@
 import bs58 from "bs58";
 import "colors";
-
-// POI topic configs, can probably be moved into POI message class
-export type Attestation = {
-  nPOI: string;
-  deployment: string;
-  blockNumber: number;
-  indexerAddress: string;
-  stakeWeight: number;
-};
+import { NPOIRecord } from "./types";
 
 export const defaultModel = "default => 100000;";
 
-export function processAttestations(localnPOIs, nPOIs, targetBlock) {
+export const processAttestations = (
+  targetBlock: number,
+  operator: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any
+) => {
   const divergedDeployments: string[] = [];
-  localnPOIs.forEach((blocks, subgraphDeployment) => {
-    if (
-      !nPOIs.has(subgraphDeployment) ||
-      !nPOIs.get(subgraphDeployment).has(targetBlock)
-    ) {
-      console.debug(
-        `No attestations for ${subgraphDeployment} on block ${targetBlock} at the moment`
-      );
-      return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db.all(
+    "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM npois WHERE block = ?",
+    targetBlock,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any, rows: NPOIRecord[]) => {
+      if (err) {
+        console.log(`An error occurred: ${err.message}`);
+      }
+
+      console.log("🔎 All nPOIs:");
+      console.log(rows);
+      
+      const localNPOIs = rows.filter((record) => record.operator === operator);
+
+      console.log("🔎 Local nPOIs:");
+      console.log(localNPOIs);
+
+      if (localNPOIs.length > 0) {
+        localNPOIs.forEach((record) => {
+          const { subgraph, nPOI } = record;
+
+          // This check should include excluding our own attestations, but leaving it for now for ease of testing
+          const remoteNPOIs = rows.filter(
+            (record) => record.subgraph === subgraph
+          );
+
+          if (remoteNPOIs === undefined || remoteNPOIs.length === 0) {
+            console.debug(
+              `No remote attestations for ${subgraph} on block ${targetBlock} at the moment.`
+            );
+            return [];
+          }
+
+          const topAttestation = sortAttestations(remoteNPOIs)[0];
+          console.log(`📒 Attestation check`.blue, {
+            subgraph,
+            block: targetBlock,
+            remoteNPOIs,
+            mostStaked: topAttestation.nPOI,
+            indexerAddresses: topAttestation.operators,
+            nPOI,
+          });
+
+          if (topAttestation.nPOI === nPOI) {
+            console.debug(
+              `✅ POIs match for subgraphDeployment ${subgraph} on block ${targetBlock}.`
+                .green
+            );
+          } else {
+            //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
+            //But I guess they cannot specifically buy as queries go through ISA
+            console.warn(
+              `❌ POIS do not match, updating cost model to block off incoming queries`
+                .red
+            );
+            // Cost model schema used byte32 representation of the deployment hash
+            divergedDeployments.push(
+              Buffer.from(bs58.decode(subgraph))
+                .toString("hex")
+                .replace("1220", "0x")
+            );
+          }
+        });
+      }
     }
-
-    const localNPOI = blocks.get(targetBlock);
-    const attestations = nPOIs.get(subgraphDeployment).get(targetBlock);
-
-    const topAttestation = sortAttestations(attestations)[0];
-    console.log(`📒 Attestation check`.blue, {
-      subgraphDeployment,
-      block: targetBlock,
-      attestations,
-      mostStaked: topAttestation.nPOI,
-      indexerAddresses: topAttestation.indexers,
-      localNPOI,
-    });
-
-    if (topAttestation.nPOI === localNPOI) {
-      console.debug(
-        `✅ POIs match for subgraphDeployment ${subgraphDeployment} on block ${targetBlock}.`
-          .green
-      );
-    } else {
-      //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
-      //But I guess they cannot specifically buy as queries go through ISA
-      console.warn(
-        `❌ POIS do not match, updating cost model to block off incoming queries`
-          .red
-      );
-      // Cost model schema used byte32 representation of the deployment hash
-      divergedDeployments.push(
-        Buffer.from(bs58.decode(subgraphDeployment))
-          .toString("hex")
-          .replace("1220", "0x")
-      );
-    }
-  });
+  );
   return divergedDeployments;
-}
-
-export const printNPOIs = (nPOIs: Map<string, Map<string, Attestation[]>>) => {
-  if (nPOIs.size === 0) {
-    console.log("😔 State is empty.".blue);
-  }
-  nPOIs.forEach((blocks, subgraph) => {
-    console.debug(`\n📝 Printing nPOIs for subgraph ${subgraph}:`.blue);
-    blocks.forEach((attestations, block) => {
-      console.log(`🔍  Attestations for block ${block}:`.cyan);
-      attestations.forEach((a) => {
-        console.log(
-          `nPOI: ${a.nPOI}\nSender: ${a.indexerAddress}\nStake:${a.stakeWeight}\n`
-            .cyan
-        );
-      });
-    });
-  });
 };
 
-export const sortAttestations = (attestations: Attestation[]) => {
+//TODO: modify attestation types
+export const sortAttestations = (records: NPOIRecord[]) => {
   const groups = [];
-  attestations.forEach((attestation: Attestation) => {
+  records.forEach((record: NPOIRecord) => {
     // if match with group's nPOI, update that group
-    const matchedGroup = groups.find((g) => g.nPOI === attestation.nPOI);
+    const matchedGroup = groups.find((g) => g.nPOI === record.nPOI);
     if (matchedGroup) {
-      matchedGroup.stakeWeight += attestation.stakeWeight;
-      matchedGroup.indexers.push(attestation.indexerAddress);
+      matchedGroup.stakeWeight += record.stakeWeight;
+      matchedGroup.operators.push(record.operator);
     } else {
       groups.push({
-        nPOI: attestation.nPOI,
-        stakeWeight: attestation.stakeWeight,
-        indexers: [attestation.indexerAddress],
+        nPOI: record.nPOI,
+        stakeWeight: record.stakeWeight,
+        operators: [record.operator],
       });
     }
   });
 
   const sorted = groups.sort((a, b) => Number(b.stakeWeight - a.stakeWeight));
   return sorted;
-};
-
-export const storeAttestations = (nPOIs, attestation) => {
-  const deployment = attestation.deployment;
-  const blockNum = attestation.blockNumber.toString();
-  if (nPOIs.has(deployment)) {
-    const blocks = nPOIs.get(attestation.deployment);
-    if (blocks.has(blockNum)) {
-      const attestations = [...blocks.get(blockNum), attestation];
-      blocks.set(blockNum, attestations);
-    } else {
-      blocks.set(blockNum, [attestation]);
-    }
-  } else {
-    nPOIs.set(deployment, new Map([[blockNum, [attestation]]]));
-  }
 };

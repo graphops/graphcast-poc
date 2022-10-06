@@ -18,3 +18,11 @@ export type CostModel = {
   model: string;
   variables?: string;
 };
+
+export type NPOIRecord = {
+  subgraph: string;
+  block: number;
+  nPOI: string;
+  operator: string;
+  stakeWeight: bigint;
+};

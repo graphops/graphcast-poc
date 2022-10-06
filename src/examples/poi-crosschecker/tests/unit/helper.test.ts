@@ -1,6 +1,6 @@
-import { ClientManager } from "../../ethClient";
-import { Messenger } from "../../messenger";
-import { Observer } from "../../observer";
+import { ClientManager } from "../../../../ethClient";
+import { Messenger } from "../../../../messenger";
+import { Observer } from "../../../../observer";
 
 declare const ETH_NODE: string;
 declare const RADIO_OPERATOR_PRIVATE_KEY: string;
