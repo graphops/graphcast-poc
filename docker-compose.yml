@@ -34,7 +34,6 @@ services:
       - RADIO_OPERATOR_PRIVATE_KEY=b48865ce8ba26a8cdc2ece89869992fcac7771cd4766dab870a860b273f3d332
       - GRAPH_NODE=http://host.docker.internal:8031/mock-graph-node/graphql
 
-
   indexer-3:
     build:
       context: .
