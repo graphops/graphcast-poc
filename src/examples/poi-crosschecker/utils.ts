@@ -81,24 +81,6 @@ export const processAttestations = (
   return divergedDeployments;
 };
 
-export const printNPOIs = (nPOIs: Map<string, Map<string, NPOIRecord[]>>) => {
-  if (nPOIs.size === 0) {
-    console.log("😔 State is empty.".blue);
-  }
-  nPOIs.forEach((blocks, subgraph) => {
-    console.debug(`\n📝 Printing nPOIs for subgraph ${subgraph}:`.blue);
-    blocks.forEach((attestations, block) => {
-      console.log(`🔍  Attestations for block ${block}:`.cyan);
-      attestations.forEach((a) => {
-        console.log(
-          `nPOI: ${a.nPOI}\nSender: ${a.operator}\nStake:${a.stakeWeight}\n`
-            .cyan
-        );
-      });
-    });
-  });
-};
-
 //TODO: modify attestation types
 export const sortAttestations = (records: NPOIRecord[]) => {
   const groups = [];
@@ -107,16 +89,16 @@ export const sortAttestations = (records: NPOIRecord[]) => {
     const matchedGroup = groups.find((g) => g.nPOI === record.nPOI);
     if (matchedGroup) {
       matchedGroup.stakeWeight += record.stakeWeight;
-      matchedGroup.indexers.push(record.operator);
+      matchedGroup.operators.push(record.operator);
     } else {
       groups.push({
         nPOI: record.nPOI,
         stakeWeight: record.stakeWeight,
-        indexers: [record.operator],
+        operators: [record.operator],
       });
     }
   });
 
-  const sorted = groups.sort((a, b) => Number(a.stakeWeight - b.stakeWeight));
+  const sorted = groups.sort((a, b) => Number(b.stakeWeight - a.stakeWeight));
   return sorted;
 };
