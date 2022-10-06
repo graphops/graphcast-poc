@@ -115,7 +115,7 @@ const run = async () => {
           blockNumber,
           nPOI,
           sender,
-          sender === operatorAddress ? 0 : stakeWeight
+          stakeWeight
         );
         stmt.finalize();
       });
