@@ -34,7 +34,7 @@ export const processAttestations = (
           const { subgraph, nPOI } = record;
 
           // This check should include excluding our own attestations, but leaving it for now for ease of testing
-          const remoteNPOIs = localNPOIs.filter(
+          const remoteNPOIs = rows.filter(
             (record) => record.subgraph === subgraph
           );
 
@@ -51,7 +51,7 @@ export const processAttestations = (
             block: targetBlock,
             remoteNPOIs,
             mostStaked: topAttestation.nPOI,
-            indexerAddresses: topAttestation.indexers,
+            indexerAddresses: topAttestation.operators,
             nPOI,
           });
 
