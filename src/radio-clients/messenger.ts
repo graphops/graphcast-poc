@@ -1,14 +1,14 @@
-import { GraphcastMessage } from "./graphcastMessage";
+import { GraphcastMessage } from "../radio-common/graphcastMessage";
 import { Waku, WakuMessage } from "js-waku";
-import { ClientManager } from "./ethClient";
-import { WriteMessageArgs } from "./types";
+import { ClientManager } from "./clientManager";
+import { WriteMessageArgs } from "../radio-common/types";
 import { Logger } from "@graphprotocol/common-ts";
 export class Messenger {
   wakuInstance: Waku;
   clientManager: ClientManager;
   logger: Logger;
 
-  async init(parentLogger: Logger, waku: Waku, clients: ClientManager) {
+  init(parentLogger: Logger, waku: Waku, clients: ClientManager) {
     this.logger = parentLogger.child({
       component: "Messenger",
     });
@@ -38,9 +38,7 @@ export class Messenger {
         signature: signature,
       });
 
-      const encodedMessage = message.encode();
-
-      return encodedMessage;
+      return message.encode();
     } catch (error) {
       throw Error(
         `Cannot write and encode the message, check formatting\n` + error

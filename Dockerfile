@@ -15,5 +15,7 @@ WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 
 ENV TERM "xterm-256color"
 ENV ETH_NODE "<ETH_NODE>"
+ENV LOG_LEVEL "trace"
+ENV TEST_TOPIC "QmeccoXogKyEBBewvfwK7D391XzdnkBkLmEboXE9cE9X8N"
 
 CMD node poi-crosschecker.js

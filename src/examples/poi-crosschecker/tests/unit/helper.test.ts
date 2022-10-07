@@ -1,8 +1,6 @@
 import { createLogger } from "@graphprotocol/common-ts";
-import { Waku } from "js-waku";
-import { ClientManager } from "../../../../ethClient";
-import { Messenger } from "../../../../messenger";
-import { Observer } from "../../../../observer";
+import { ClientManager } from "../../../../radio-clients/clientManager";
+import { GossipAgent } from "./../../../../radio-clients/gossipAgent";
 
 declare const ETH_NODE: string;
 declare const RADIO_OPERATOR_PRIVATE_KEY: string;
@@ -11,10 +9,8 @@ declare const GRAPH_NODE: string;
 declare const INDEXER_MANAGEMENT_SERVER: string;
 declare const REGISTRY_SUBGRAPH: string;
 
-let messenger: Messenger;
-let observer: Observer;
 let block: { number: number; hash: string };
-let clientManager: ClientManager;
+let gossipAgent: GossipAgent;
 let rawMessage_okay: { nPOI: string; subgraph: string };
 let types: Array<{
   name: string;
@@ -23,14 +19,6 @@ let types: Array<{
 
 const setup = async () => {
   jest.spyOn(console, "error").mockImplementation(jest.fn());
-
-  const waku = await Waku.create({
-    bootstrap: {
-      default: true,
-    },
-  });
-  await waku.waitForRemotePeer();
-
   const logger = createLogger({
     name: `poi-crosschecker`,
     async: false,
@@ -38,20 +26,17 @@ const setup = async () => {
     level: process.env.logLevel as any,
   });
 
-  messenger = new Messenger();
-  observer = new Observer();
-
-  clientManager = new ClientManager({
-    ethNodeUrl: ETH_NODE,
-    operatorPrivateKey: RADIO_OPERATOR_PRIVATE_KEY,
-    registry: REGISTRY_SUBGRAPH,
-    graphNodeStatus: GRAPH_NODE,
-    indexerManagementServer: INDEXER_MANAGEMENT_SERVER,
-    graphNetworkUrl: NETWORK_SUBGRAPH,
+  const clientManager = new ClientManager({
+    operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
+    ethNodeUrl: process.env.ETH_NODE,
+    registry: process.env.REGISTRY_SUBGRAPH,
+    graphNodeStatus: process.env.GRAPH_NODE,
+    indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER,
+    graphNetworkUrl: process.env.NETWORK_SUBGRAPH,
   });
 
-  await messenger.init(logger, waku, clientManager);
-  await observer.init(logger, waku, clientManager);
+  gossipAgent = new GossipAgent(logger, clientManager);
+  await gossipAgent.init();
 
   // Mocks
   Date.now = jest.fn(() => new Date().getTime() - 3_500_000);
@@ -59,7 +44,7 @@ const setup = async () => {
     number: 1,
     hash: "0x0001",
   };
-  observer.clientManager.ethClient.buildBlock = jest.fn(async (number) => {
+  gossipAgent.clientManager.ethClient.buildBlock = jest.fn(async (number) => {
     return {
       number: number,
       hash: "0x000" + number,
@@ -81,14 +66,14 @@ describe("Messenger and Observer helpers", () => {
   beforeAll(setup);
   describe("Write and Observe", () => {
     test("write and observe a message - success", async () => {
-      const encodedMessage = await messenger.writeMessage({
+      const encodedMessage = await gossipAgent.messenger.writeMessage({
         radioPayload: rawMessage_okay,
         types,
         block,
       });
       expect(encodedMessage).toBeDefined();
 
-      const message = observer._decodeMessage(encodedMessage, types);
+      const message = gossipAgent.observer._decodeMessage(encodedMessage, types);
 
       expect(message).toBeDefined();
       expect(Number(message.blockNumber)).toEqual(block.number);
@@ -103,7 +88,7 @@ describe("Messenger and Observer helpers", () => {
       };
       await expect(
         async () =>
-          await messenger.writeMessage({
+          await gossipAgent.messenger.writeMessage({
             radioPayload: rawMessage_bad,
             types,
             block,
@@ -115,11 +100,11 @@ describe("Messenger and Observer helpers", () => {
 
     //TODO: fix registry
     // test("Gossip agent registry check", async () => {
-    //   const operatorAddress = clientManager.ethClient
+    //   const operatorAddress = gossipAgent.clientManager.ethClient
     //     .getAddress()
     //     .toLowerCase();
 
-    //   const indexerAddress = await observer.radioFilter.isOperatorOf(
+    //   const indexerAddress = await gossipAgent.observer.radioFilter.isOperatorOf(
     //     observer.clientManager.registry,
     //     operatorAddress
     //   );
@@ -128,14 +113,14 @@ describe("Messenger and Observer helpers", () => {
 
     // // test the observer
     //   test("Observer prepare attestations", async () => {
-    //     const encodedMessage = await messenger.writeMessage({
+    //     const encodedMessage = await gossipAgent.messenger.writeMessage({
     //       radioPayload: rawMessage_okay,
     //       types,
     //       block,
     //     });
     //     // first message always fails
     //     expect(
-    //       await observer.readMessage({
+    //       await gossipAgent.observer.readMessage({
     //         msg: encodedMessage,
     //         topic: "topic",
     //         types,
@@ -144,13 +129,13 @@ describe("Messenger and Observer helpers", () => {
 
     //     // later message with a higher nonce...
     //     Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
-    //     const encodedMessage2 = await messenger.writeMessage({
+    //     const encodedMessage2 = await gossipAgent.messenger.writeMessage({
     //       radioPayload: rawMessage_okay,
     //       types,
     //       block,
     //     });
     //     expect(
-    //       await observer.readMessage({
+    //       await gossipAgent.observer.readMessage({
     //         msg: encodedMessage2,
     //         topic: "topic",
     //         types,
@@ -159,13 +144,13 @@ describe("Messenger and Observer helpers", () => {
 
     //     // tries to inject to the past
     //     Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
-    //     const encodedMessage3 = await messenger.writeMessage({
+    //     const encodedMessage3 = await gossipAgent.messenger.writeMessage({
     //       radioPayload: rawMessage_okay,
     //       types,
     //       block,
     //     });
     //     expect(
-    //       await observer.readMessage({
+    //       await gossipAgent.observer.readMessage({
     //         msg: encodedMessage3,
     //         topic: "topic",
     //         types,

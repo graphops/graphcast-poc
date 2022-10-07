@@ -1,12 +1,10 @@
+import { GossipAgent } from "./../../radio-clients/gossipAgent";
 import "colors";
 import "dotenv/config";
-import { Observer } from "../../observer";
-import { Messenger } from "../../messenger";
-import { ClientManager } from "../../ethClient";
+import { ClientManager } from "../../radio-clients/clientManager";
 import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
 import { defaultModel, processAttestations } from "./utils";
 import { createLogger } from "@graphprotocol/common-ts";
-import { Waku } from "js-waku";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
@@ -18,12 +16,6 @@ const RADIO_PAYLOAD_TYPES = [
 ];
 
 const run = async () => {
-  const waku = await Waku.create({
-    bootstrap: {
-      default: true,
-    },
-  });
-
   const logger = createLogger({
     name: `poi-crosschecker`,
     async: false,
@@ -57,38 +49,25 @@ const run = async () => {
     graphNetworkUrl: process.env.NETWORK_SUBGRAPH,
   });
 
-  const messenger = new Messenger();
-  const observer = new Observer();
-
-  await messenger.init(logger, waku, clientManager);
-  await observer.init(logger, waku, clientManager);
-
-  const operatorAddress = clientManager.ethClient.getAddress().toLowerCase();
-
-  const ethBalance = await clientManager.ethClient.getEthBalance();
-  const indexerAddress = await observer.radioFilter.isOperatorOf(
-    observer.clientManager.registry,
-    operatorAddress
-  );
+  const gossipAgent = new GossipAgent(logger, clientManager);
+  const indexerAddress = await gossipAgent.init();
 
   logger.debug(
-    `🔦 Radio operator resolved to indexer address ${operatorAddress} -> ${indexerAddress}`,
+    `🔦 Radio operator resolved to indexer address ${indexerAddress}`,
     {
-      operatorEthBalance: ethBalance,
-      operatorPublicKey: clientManager.ethClient.wallet.publicKey,
+      operatorPublicKey: gossipAgent.clientManager.ethClient.wallet.publicKey,
     }
   );
 
   // Initial queries
-  const deploymentIPFSs =
-    [process.env.TEST_TOPIC] ??
-    (
-      await fetchAllocations(
-        logger,
-        clientManager.networkSubgraph,
-        indexerAddress
-      )
-    ).map((a) => a.subgraphDeployment.ipfsHash);
+  const deploymentIPFSs = (
+    await fetchAllocations(
+      logger,
+      gossipAgent.clientManager.networkSubgraph,
+      indexerAddress
+    )
+  ).map((a) => a.subgraphDeployment.ipfsHash);
+  deploymentIPFSs.push(process.env.TEST_TOPIC);
   const topics = deploymentIPFSs.map(
     (ipfsHash: string) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
   );
@@ -106,7 +85,7 @@ const run = async () => {
     try {
       // temporarily removed self check for easy testing
       logger.info(`📮 A new message has been received! Handling the message`);
-      const message = await observer.readMessage({
+      const message = await gossipAgent.processMessage({
         msg,
         topic,
         types: RADIO_PAYLOAD_TYPES,
@@ -127,17 +106,18 @@ const run = async () => {
     }
   };
 
-  observer.observe(topics, poiHandler);
+  gossipAgent.observer.observe(topics, poiHandler);
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
   const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
-    const blockObject = await clientManager.ethClient.provider.getBlock(block);
+    const blockObject =
+      await gossipAgent.clientManager.ethClient.provider.getBlock(block);
     const unavailableDplymts = [];
 
     DeploymentIpfses.forEach(async (ipfsHash) => {
       const localPOI = await fetchPOI(
         logger,
-        clientManager.graphNodeStatus,
+        gossipAgent.clientManager.graphNodeStatus,
         ipfsHash,
         block,
         blockObject.hash,
@@ -156,14 +136,14 @@ const run = async () => {
         nPOI: localPOI,
       };
 
-      const encodedMessage = await messenger.writeMessage({
+      const encodedMessage = await gossipAgent.messenger.writeMessage({
         radioPayload,
         types: RADIO_PAYLOAD_TYPES,
         block: blockObject,
       });
 
       logger.debug(`📬 Wrote and encoded message, sending`);
-      await messenger.sendMessage(
+      await gossipAgent.messenger.sendMessage(
         encodedMessage,
         `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
       );
@@ -178,7 +158,7 @@ const run = async () => {
   };
 
   let compareBlock = 0;
-  clientManager.ethClient.provider.on("block", async (block) => {
+  gossipAgent.clientManager.ethClient.provider.on("block", async (block) => {
     logger.debug(`🔗 ${block}`);
 
     if (block % 5 === 0) {
@@ -193,7 +173,7 @@ const run = async () => {
       const divergedDeployments = processAttestations(
         logger,
         block - 8,
-        operatorAddress,
+        indexerAddress,
         db
       );
       if (divergedDeployments.length > 0) {
@@ -203,7 +183,7 @@ const run = async () => {
         });
         divergedDeployments.map((deployment) =>
           //TODO: add response handling
-          updateCostModel(logger, clientManager.indexerManagement, {
+          updateCostModel(logger, gossipAgent.clientManager.indexerManagement, {
             deployment,
             model: defaultModel,
             variables: null,
