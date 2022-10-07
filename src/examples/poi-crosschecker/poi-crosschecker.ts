@@ -16,7 +16,8 @@ const RADIO_PAYLOAD_TYPES = [
 
 const run = async () => {
   const db = new sqlite3.Database(
-    "/usr/app/poi_crosschecker.db",
+    // TODO: Extract this to constant?
+    "/usr/app/dist/src/examples/poi-crosschecker/npois.db",
     sqlite3.OPEN_READWRITE,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any) => {
@@ -78,7 +79,7 @@ const run = async () => {
     {
       indexerAddress:
         indexerAddress ??
-        "Graphcast agent is not registered as an indexer operator", 
+        "Graphcast agent is not registered as an indexer operator",
       topics,
     }
   );
@@ -99,24 +100,13 @@ const run = async () => {
       const { radioPayload, blockNumber, sender, stakeWeight } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
-      const indexerAddress = await observer.radioFilter.isOperatorOf(
-        clientManager.registry,
-        sender
-      );
-
       console.info(
         `Payload: Subgraph (ipfs hash): ${subgraph}\nnPOI: ${nPOI}\n`.green
       );
 
       db.serialize(() => {
         const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        stmt.run(
-          subgraph,
-          blockNumber,
-          nPOI,
-          sender,
-          stakeWeight
-        );
+        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight);
         stmt.finalize();
       });
     } catch {
@@ -137,7 +127,7 @@ const run = async () => {
         ipfsHash,
         block,
         blockObject.hash,
-        indexerAddress
+        // indexerAddress
       );
 
       if (!localPOI) {
@@ -178,17 +168,19 @@ const run = async () => {
   clientManager.ethClient.provider.on("block", async (block) => {
     console.log(`🔗 ${block}`);
 
-    if (block % 5 === 0) {
+    if (block % 10 === 0) {
+      console.log("🗑️ Cleaning DB.");
+      db.run("DELETE FROM npois");
       // Going 5 blocks back as a buffer to make sure the node is fully synced
       sendNPOIs(block - 5, deploymentIPFSs);
-      compareBlock = block + 3;
+      compareBlock = block + 5;
     }
 
     if (block == compareBlock) {
       console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue);
 
       const divergedDeployments = processAttestations(
-        block - 8,
+        block - 10,
         operatorAddress,
         db
       );
@@ -208,7 +200,6 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
-      db.run("DELETE FROM npois");
     }
   });
 };
