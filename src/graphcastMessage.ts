@@ -1,4 +1,5 @@
 import * as protobuf from "protobufjs/light";
+import { Logger, createLogger } from "@graphprotocol/common-ts";
 
 const Type = protobuf.Type;
 const Field = protobuf.Field;
@@ -38,10 +39,7 @@ export class GraphcastMessage {
       bytes
     ) as unknown as GraphcastMessagePayload;
     if (!payload.radioPayload) {
-      console.log(
-        "Radio payload is missing on decoded GraphcastMessage",
-        payload
-      );
+      throw new Error("Radio payload is missing on decoded GraphcastMessage");
       return;
     }
     return new GraphcastMessage(payload);

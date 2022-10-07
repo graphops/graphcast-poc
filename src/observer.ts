@@ -5,23 +5,22 @@ import RadioFilter from "./radio-common/customs";
 import { ethers } from "ethers";
 import { GraphcastMessage } from "./graphcastMessage";
 import { ReadMessageArgs } from "./types";
+import { Logger, createLogger } from "@graphprotocol/common-ts";
 
 export class Observer {
   wakuInstance: Waku;
   radioFilter: RadioFilter;
   clientManager: ClientManager;
+  logger: Logger;
 
-  async init(clients: ClientManager) {
-    const waku = await Waku.create({
-      bootstrap: {
-        default: true,
-      },
+  async init(parentLogger: Logger, waku: Waku, clients: ClientManager) {
+    this.logger = parentLogger.child({
+      component: "Observer",
     });
 
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
-
-    this.radioFilter = new RadioFilter();
+    this.radioFilter = new RadioFilter(this.logger);
     this.clientManager = clients;
   }
 
@@ -79,9 +78,8 @@ export class Observer {
         return;
       }
 
-      console.info(
+      this.logger.info(
         `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}`
-          .green
       );
 
       return {
@@ -91,7 +89,7 @@ export class Observer {
         stakeWeight,
       };
     } catch (error) {
-      console.error(`Observer could not read message`, {
+      this.logger.error(`Failed to read and validate message`, {
         error: error.message,
       });
       return;

@@ -1,6 +1,7 @@
 import { gql } from "graphql-tag";
 import { CostModel } from "./types";
 import { Client } from "@urql/core";
+import { Logger } from "@graphprotocol/common-ts";
 
 //TODO: condense for better and more efficient query and cache
 export const indexerAllocationsQuery = gql`
@@ -17,24 +18,32 @@ export const indexerAllocationsQuery = gql`
   }
 `;
 
-export async function fetchAllocations(client: Client, address: string) {
+export async function fetchAllocations(
+  logger: Logger,
+  client: Client,
+  address: string
+) {
   try {
     const result = await client
       .query(indexerAllocationsQuery, { address })
       .toPromise();
     if (result.error) {
-      throw result.error;
+      logger.warn(`Failed to fetch allocations`, { err: result.error });
+      throw new Error(result.error.message);
     }
     return result.data.indexer.allocations;
   } catch (error) {
-    console.warn(`No allocation fetched, check connection and address`, {
+    logger.warn(`No allocation fetched, check connection and address`, {
       error: error.message,
     });
     return [];
   }
 }
 
-export const costModels = async (client: Client): Promise<CostModel[]> => {
+export const costModels = async (
+  logger: Logger,
+  client: Client
+): Promise<CostModel[]> => {
   try {
     const result = await client
       .query(
@@ -51,16 +60,21 @@ export const costModels = async (client: Client): Promise<CostModel[]> => {
       .toPromise();
 
     if (result.error) {
-      throw result.error;
+      logger.error(`Failed to fetch cost models`, { err: result.error });
+      throw new Error(result.error.message);
     }
     return result.data.costModels;
   } catch (error) {
-    console.warn(`Failed to query costModels`, { error: error.message });
+    logger.warn(`Failed to query costModels`, { error: error.message });
     return [];
   }
 };
 
-export async function updateCostModel(client: Client, costModel: CostModel) {
+export async function updateCostModel(
+  logger: Logger,
+  client: Client,
+  costModel: CostModel
+) {
   try {
     const result = await client
       .mutation(
@@ -78,13 +92,13 @@ export async function updateCostModel(client: Client, costModel: CostModel) {
       .toPromise();
 
     if (result.error) {
-      throw result.error;
+      logger.warn(`Failed to update cost model`, { err: result.error });
+      throw new Error(result.error.message);
     }
     return result.data.setCostModel;
   } catch (error) {
-    console.warn(
-      `Failed to update cost model for ${costModel.deployment} at indexer management server, skip for now`
-        .yellow,
+    logger.warn(
+      `Failed to update cost model for ${costModel.deployment} at indexer management server, skip for now`,
       {
         error: error.message,
       }
@@ -122,6 +136,7 @@ export const poiQuery = (
 };
 
 export async function fetchPOI(
+  logger: Logger,
   client: Client,
   subgraph: string,
   block: number,
@@ -133,12 +148,13 @@ export async function fetchPOI(
       ? await client.query(poiQuery(subgraph, block, hash, indexer)).toPromise()
       : await client.query(poiQuery(subgraph, block, hash)).toPromise();
     if (result.error) {
-      throw result.error;
+      logger.warn(`Failed to fetch POI`, { err: result.error });
+      throw new Error(result.error.message);
     }
     return result.data.proofOfIndexing;
   } catch (error) {
-    console.warn(
-      `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`.yellow,
+    logger.warn(
+      `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`,
       { error: error.message }
     );
   }

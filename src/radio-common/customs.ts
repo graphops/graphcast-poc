@@ -7,26 +7,30 @@ import {
   fetchOperatorOfIndexers,
 } from "./queries";
 import { BlockPointer, MessageValidityArgs } from "../types";
+import { Logger } from "@graphprotocol/common-ts";
 
 const ONE_HOUR = 3_600_000;
 export default class RadioFilter {
   msgReplayLimit: number;
   minStakeReq: number;
-  //TODO: store state before process exit
   nonceDirectory: Map<string, Map<string, number>>;
+  logger: Logger;
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  constructor() {
+  constructor(parentLogger: Logger) {
     this.msgReplayLimit = ONE_HOUR;
     this.minStakeReq;
     this.nonceDirectory = new Map();
+    this.logger = parentLogger.child({
+      component: "Radio filter",
+    });
   }
 
   public async setRequirement(client: Client) {
-    this.minStakeReq = await fetchMinStake(client);
+    this.minStakeReq = await fetchMinStake(this.logger, client);
   }
 
   public async isOperatorOf(client: Client, sender: string) {
-    const res = await fetchOperatorOfIndexers(client, sender);
+    const res = await fetchOperatorOfIndexers(this.logger, client, sender);
     return res ? res[0] : "";
   }
 
@@ -35,13 +39,13 @@ export default class RadioFilter {
   }
 
   public async indexerCheck(client: Client, address: string) {
-    const senderStake = await fetchStake(client, address);
+    const senderStake = await fetchStake(this.logger, client, address);
 
     if (!this.minStakeReq) {
       this.setRequirement(client);
     }
     if (senderStake < this.minStakeReq) {
-      console.error(
+      this.logger.warn(
         `Identity does not satisfy the minimum indexer stake, message discarded.`,
         {
           senderStake,
@@ -83,7 +87,7 @@ export default class RadioFilter {
   }
 
   public async disputeStatusCheck(client: Client, address: string) {
-    const senderDisputes = await fetchDisputes(client, address);
+    const senderDisputes = await fetchDisputes(this.logger, client, address);
     //Note: a more relaxed check is if there's dispute with Undecided status
     return senderDisputes.reduce(
       (slashedRecord, dispute) =>
@@ -99,7 +103,7 @@ export default class RadioFilter {
     // Resolve signer to indexer identity and check stake and dispute statuses
     const indexerAddress = await this.isOperatorOf(registry, sender);
     if (!indexerAddress) {
-      console.warn(`👮 Sender not an operator, drop message`.red, { sender });
+      this.logger.warn(`👮 Sender not an operator, drop message`.red, { sender });
       return 0;
     }
 
@@ -109,7 +113,7 @@ export default class RadioFilter {
       indexerAddress
     );
     if (senderStake == 0 || tokensSlashed > 0) {
-      console.warn(
+      this.logger.warn(
         `👮 Indexer identity failed stake requirement or has been slashed, drop message`
           .red,
         {
@@ -122,7 +126,7 @@ export default class RadioFilter {
 
     // Message param checks
     if (await this.replayCheck(nonce, blockHash, block)) {
-      console.warn(`👮 Invalid timestamp (nonce), drop message`.red, {
+      this.logger.warn(`👮 Invalid timestamp (nonce), drop message`, {
         nonce,
         blockHash,
         queriedBlock: block.hash,
@@ -130,8 +134,8 @@ export default class RadioFilter {
       return 0;
     }
     if (this.inconsistentNonce(sender, topic, nonce)) {
-      console.warn(
-        `👮 Inconsistent nonce or first time sender, drop message`.red,
+      this.logger.warn(
+        `👮 Inconsistent nonce or first time sender, drop message`,
         {
           sender,
           topic,

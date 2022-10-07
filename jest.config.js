@@ -9,6 +9,7 @@ const bail = (s) => {
     testPathIgnorePatterns: ['/node_modules/', '/dist/', '.husky'],
     globals: {
       TEST_TOPIC: process.env.TEST_TOPIC || [],
+      LOG_LEVEL: process.env.LOG_LEVEL || 'info',
       NETWORK_SUBGRAPH: process.env.NETWORK_SUBGRAPH || bail('NETWORK_SUBGRAPH is not defined'),
       REGISTRY_SUBGRAPH:
         process.env.REGISTRY_SUBGRAPH ||

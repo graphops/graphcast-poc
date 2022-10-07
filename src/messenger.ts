@@ -2,15 +2,15 @@ import { GraphcastMessage } from "./graphcastMessage";
 import { Waku, WakuMessage } from "js-waku";
 import { ClientManager } from "./ethClient";
 import { WriteMessageArgs } from "./types";
+import { Logger } from "@graphprotocol/common-ts";
 export class Messenger {
   wakuInstance: Waku;
   clientManager: ClientManager;
+  logger: Logger;
 
-  async init(clients: ClientManager) {
-    const waku = await Waku.create({
-      bootstrap: {
-        default: true,
-      },
+  async init(parentLogger: Logger, waku: Waku, clients: ClientManager) {
+    this.logger = parentLogger.child({
+      component: "Messenger",
     });
 
     this.wakuInstance = waku;
@@ -28,7 +28,7 @@ export class Messenger {
           radioPayload
         );
 
-      console.log("✍️ Signing... " + signature);
+      this.logger.debug("✍️ Signing... " + signature);
 
       const message = new GraphcastMessage({
         radioPayload: JSON.stringify(radioPayload),
