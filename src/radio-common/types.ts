@@ -1,5 +1,3 @@
-import { Client } from "@urql/core";
-
 export type BlockPointer = { number: number; hash: string };
 
 export type RadioMessage = {
@@ -27,8 +25,6 @@ export type WriteMessageArgs = {
 };
 
 export type MessageValidityArgs = {
-  registry: Client;
-  graphNetwork: Client;
   sender: string;
   topic: string;
   nonce: number;

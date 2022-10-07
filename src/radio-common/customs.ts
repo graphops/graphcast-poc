@@ -1,48 +1,51 @@
 import { formatUnits } from "ethers/lib/utils";
-import { Client } from "@urql/core";
-import {
-  fetchDisputes,
-  fetchMinStake,
-  fetchStake,
-  fetchOperatorOfIndexers,
-} from "./queries";
-import { BlockPointer, MessageValidityArgs } from "../types";
+import { Client, gql } from "@urql/core";
+import { BlockPointer, Dispute, MessageValidityArgs } from "./types";
 import { Logger } from "@graphprotocol/common-ts";
+import {
+  indexerOperatorQuery,
+  operatorOfIndexerQuery,
+  indexerStakeQuery,
+  disputeIndexerQuery,
+} from "./queries";
 
 const ONE_HOUR = 3_600_000;
+
+// Message validity logic class
 export default class RadioFilter {
+  networkSubgraph: Client;
+  registry: Client;
+  logger: Logger;
   msgReplayLimit: number;
   minStakeReq: number;
   nonceDirectory: Map<string, Map<string, number>>;
-  logger: Logger;
+
   // eslint-disable-next-line @typescript-eslint/no-empty-function
-  constructor(parentLogger: Logger) {
+  constructor(parentLogger: Logger, networkSubgraph: Client, registry: Client) {
     this.msgReplayLimit = ONE_HOUR;
     this.minStakeReq;
     this.nonceDirectory = new Map();
     this.logger = parentLogger.child({
       component: "Radio filter",
     });
+    this.networkSubgraph = networkSubgraph;
+    this.registry = registry;
   }
 
-  public async setRequirement(client: Client) {
-    this.minStakeReq = await fetchMinStake(this.logger, client);
-  }
-
-  public async isOperatorOf(client: Client, sender: string) {
-    const res = await fetchOperatorOfIndexers(this.logger, client, sender);
+  public async isOperatorOf(sender: string) {
+    const res = await this.fetchOperatorOfIndexers(sender);
     return res ? res[0] : "";
   }
 
-  public async isOperator(client: Client, sender: string) {
-    return (await this.isOperatorOf(client, sender)).length !== 0;
+  public async isOperator(sender: string) {
+    return (await this.isOperatorOf(sender)).length !== 0;
   }
 
-  public async indexerCheck(client: Client, address: string) {
-    const senderStake = await fetchStake(this.logger, client, address);
+  public async indexerCheck(address: string) {
+    const senderStake = await this.fetchStake(address);
 
     if (!this.minStakeReq) {
-      this.setRequirement(client);
+      this.minStakeReq = await this.fetchMinStake();
     }
     if (senderStake < this.minStakeReq) {
       this.logger.warn(
@@ -73,12 +76,13 @@ export default class RadioFilter {
 
   public inconsistentNonce(sender: string, topic: string, nonce: number) {
     // check message nonce from local states for consistency
+    // TODO: remove return true if we decide to not drop first message)
     if (!(sender in this.nonceDirectory)) {
       this.nonceDirectory[sender] = { [topic]: nonce };
-      return true;
+      // return true;
     } else if (!(topic in this.nonceDirectory[sender])) {
       this.nonceDirectory[sender][topic] = nonce;
-      return true;
+      // return true;
     }
 
     const prevNonce: number = this.nonceDirectory[sender][topic];
@@ -86,8 +90,8 @@ export default class RadioFilter {
     return prevNonce >= nonce;
   }
 
-  public async disputeStatusCheck(client: Client, address: string) {
-    const senderDisputes = await fetchDisputes(this.logger, client, address);
+  public async disputeStatusCheck(address: string) {
+    const senderDisputes = await this.fetchDisputes(address);
     //Note: a more relaxed check is if there's dispute with Undecided status
     return senderDisputes.reduce(
       (slashedRecord, dispute) =>
@@ -97,21 +101,19 @@ export default class RadioFilter {
   }
 
   public async messageValidity(args: MessageValidityArgs) {
-    const { registry, graphNetwork, sender, topic, nonce, blockHash, block } =
-      args;
+    const { sender, topic, nonce, blockHash, block } = args;
 
     // Resolve signer to indexer identity and check stake and dispute statuses
-    const indexerAddress = await this.isOperatorOf(registry, sender);
+    const indexerAddress = await this.isOperatorOf(sender);
     if (!indexerAddress) {
-      this.logger.warn(`👮 Sender not an operator, drop message`.red, { sender });
+      this.logger.warn(`👮 Sender not an operator, drop message`.red, {
+        sender,
+      });
       return 0;
     }
 
-    const senderStake = await this.indexerCheck(graphNetwork, indexerAddress);
-    const tokensSlashed = await this.disputeStatusCheck(
-      graphNetwork,
-      indexerAddress
-    );
+    const senderStake = await this.indexerCheck(indexerAddress);
+    const tokensSlashed = await this.disputeStatusCheck(indexerAddress);
     if (senderStake == 0 || tokensSlashed > 0) {
       this.logger.warn(
         `👮 Indexer identity failed stake requirement or has been slashed, drop message`
@@ -145,5 +147,104 @@ export default class RadioFilter {
       return 0;
     }
     return senderStake;
+  }
+
+  async fetchOperators(address: string): Promise<string[]> {
+    try {
+      const result = await this.registry
+        .query(indexerOperatorQuery, { address })
+        .toPromise();
+      if (result.error) {
+        throw result.error;
+      }
+      return result.data.indexer.account.gossipOperators;
+    } catch (error) {
+      this.logger.warn(`No operators fetched, assume none`, {
+        error: error.message,
+      });
+      return [];
+    }
+  }
+
+  async fetchOperatorOfIndexers(address: string) {
+    try {
+      const result = await this.registry
+        .query(operatorOfIndexerQuery, { address })
+        .toPromise();
+      if (result.error) {
+        throw result.error;
+      }
+      return result.data.graphAccount.gossipOperatorOf.map((account) => {
+        return account.id;
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Did not find corresponding indexer address for the gossip operator`,
+        { error: error }
+      );
+      return null;
+    }
+  }
+
+  async fetchStake(address: string) {
+    try {
+      const result = await this.networkSubgraph
+        .query(indexerStakeQuery, { address })
+        .toPromise();
+      if (result.error) {
+        throw result.error;
+      }
+      return Number(formatUnits(result.data.indexer.stakedTokens, 18));
+    } catch (error) {
+      this.logger.warn(`No stake fetched for indexer ${address}, assuming 0`, {
+        error: error.message,
+      });
+      return 0;
+    }
+  }
+
+  async fetchMinStake() {
+    try {
+      const result = await this.networkSubgraph
+        .query(
+          gql`
+            {
+              graphNetwork(id: "1") {
+                minimumIndexerStake
+              }
+            }
+          `
+        )
+        .toPromise();
+      if (result.error) {
+        throw result.error;
+      }
+      return Number(
+        formatUnits(result.data.graphNetwork.minimumIndexerStake, 18)
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to fetch minimum indexer stake requirement`, {
+        error: error.message,
+      });
+      return Number.POSITIVE_INFINITY;
+    }
+  }
+
+  async fetchDisputes(address: string): Promise<Dispute[]> {
+    try {
+      const result = await this.networkSubgraph
+        .query(disputeIndexerQuery, { address })
+        .toPromise();
+      if (result.error) {
+        throw result.error;
+      }
+      return result.data.disputes;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to grab disputes, assume nothing (maybe assume something?)`,
+        { error: error.message }
+      );
+      return [];
+    }
   }
 }

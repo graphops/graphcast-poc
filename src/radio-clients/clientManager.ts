@@ -2,7 +2,7 @@ import { ethers, utils, Wallet } from "ethers";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { Client, createClient } from "@urql/core";
 import fetch from "isomorphic-fetch";
-import { ClientManagerArgs } from "./types";
+import { ClientManagerArgs } from "../radio-common/types";
 
 export class EthClient {
   provider: JsonRpcProvider;
@@ -35,9 +35,9 @@ export class EthClient {
 export class ClientManager {
   ethClient: EthClient;
   networkSubgraph: Client;
+  registry: Client;
   graphNodeStatus: Client;
   indexerManagement: Client;
-  registry: Client;
 
   constructor(args: ClientManagerArgs) {
     const {

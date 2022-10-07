@@ -1,5 +1,4 @@
 import * as protobuf from "protobufjs/light";
-import { Logger, createLogger } from "@graphprotocol/common-ts";
 
 const Type = protobuf.Type;
 const Field = protobuf.Field;

@@ -1,15 +1,14 @@
-import { ClientManager } from "./ethClient";
+import { ClientManager } from "./clientManager";
 import { Waku } from "js-waku";
 import { WakuMessage } from "js-waku/build/main/lib/waku_message/index";
-import RadioFilter from "./radio-common/customs";
+import RadioFilter from "../radio-common/customs";
 import { ethers } from "ethers";
-import { GraphcastMessage } from "./graphcastMessage";
-import { ReadMessageArgs } from "./types";
+import { GraphcastMessage } from "../radio-common/graphcastMessage";
+import { ReadMessageArgs } from "../radio-common/types";
 import { Logger, createLogger } from "@graphprotocol/common-ts";
 
 export class Observer {
   wakuInstance: Waku;
-  radioFilter: RadioFilter;
   clientManager: ClientManager;
   logger: Logger;
 
@@ -20,7 +19,6 @@ export class Observer {
 
     await waku.waitForRemotePeer();
     this.wakuInstance = waku;
-    this.radioFilter = new RadioFilter(this.logger);
     this.clientManager = clients;
   }
 
@@ -61,32 +59,12 @@ export class Observer {
 
       const sender = ethers.utils.recoverAddress(hash, signature).toLowerCase();
 
-      const block = await this.clientManager.ethClient.buildBlock(
-        Number(blockNumber)
-      );
-
-      const stakeWeight = await this.radioFilter.messageValidity({
-        registry: this.clientManager.registry,
-        graphNetwork: this.clientManager.networkSubgraph,
-        sender,
-        topic,
-        nonce: Number(nonce),
-        blockHash,
-        block,
-      });
-      if (stakeWeight <= 0) {
-        return;
-      }
-
-      this.logger.info(
-        `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}`
-      );
-
       return {
         radioPayload,
+        nonce,
         blockNumber,
+        blockHash,
         sender,
-        stakeWeight,
       };
     } catch (error) {
       this.logger.error(`Failed to read and validate message`, {
