@@ -1,10 +1,12 @@
 import bs58 from "bs58";
 import "colors";
 import { NPOIRecord } from "./types";
+import { Logger } from "@graphprotocol/common-ts";
 
 export const defaultModel = "default => 100000;";
 
 export const processAttestations = (
+  logger: Logger,
   targetBlock: number,
   operator: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,16 +20,12 @@ export const processAttestations = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, rows: NPOIRecord[]) => {
       if (err) {
-        console.log(`An error occurred: ${err.message}`);
+        logger.error(`An error occurred: ${err.message}`);
       }
 
-      console.log("🔎 All nPOIs:");
-      console.log(rows);
-      
       const localNPOIs = rows.filter((record) => record.operator === operator);
 
-      console.log("🔎 Local nPOIs:");
-      console.log(localNPOIs);
+      logger.debug("🔎 POIs", { localNPOIs, allnPOIs: rows });
 
       if (localNPOIs.length > 0) {
         localNPOIs.forEach((record) => {
@@ -39,14 +37,14 @@ export const processAttestations = (
           );
 
           if (remoteNPOIs === undefined || remoteNPOIs.length === 0) {
-            console.debug(
+            logger.debug(
               `No remote attestations for ${subgraph} on block ${targetBlock} at the moment.`
             );
             return [];
           }
 
           const topAttestation = sortAttestations(remoteNPOIs)[0];
-          console.log(`📒 Attestation check`.blue, {
+          logger.info(`📒 Attestation check`, {
             subgraph,
             block: targetBlock,
             remoteNPOIs,
@@ -56,16 +54,14 @@ export const processAttestations = (
           });
 
           if (topAttestation.nPOI === nPOI) {
-            console.debug(
+            logger.debug(
               `✅ POIs match for subgraphDeployment ${subgraph} on block ${targetBlock}.`
-                .green
             );
           } else {
             //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
             //But I guess they cannot specifically buy as queries go through ISA
-            console.warn(
+            logger.warn(
               `❌ POIS do not match, updating cost model to block off incoming queries`
-                .red
             );
             // Cost model schema used byte32 representation of the deployment hash
             divergedDeployments.push(
