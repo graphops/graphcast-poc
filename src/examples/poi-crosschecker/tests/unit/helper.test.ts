@@ -23,7 +23,7 @@ const setup = async () => {
     name: `poi-crosschecker`,
     async: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    level: process.env.logLevel as any,
+    level: "fatal",
   });
 
   const clientManager = new ClientManager({
@@ -73,7 +73,10 @@ describe("Messenger and Observer helpers", () => {
       });
       expect(encodedMessage).toBeDefined();
 
-      const message = gossipAgent.observer._decodeMessage(encodedMessage, types);
+      const message = gossipAgent.observer._decodeMessage(
+        encodedMessage,
+        types
+      );
 
       expect(message).toBeDefined();
       expect(Number(message.blockNumber)).toEqual(block.number);
@@ -98,64 +101,72 @@ describe("Messenger and Observer helpers", () => {
       );
     });
 
-    //TODO: fix registry
-    // test("Gossip agent registry check", async () => {
-    //   const operatorAddress = gossipAgent.clientManager.ethClient
-    //     .getAddress()
-    //     .toLowerCase();
+    test("Gossip agent registry check", async () => {
+      const operatorAddress = gossipAgent.clientManager.ethClient
+        .getAddress()
+        .toLowerCase();
 
-    //   const indexerAddress = await gossipAgent.observer.radioFilter.isOperatorOf(
-    //     observer.clientManager.registry,
-    //     operatorAddress
-    //   );
-    //   expect(indexerAddress).toBeDefined();
-    // });
+      const indexerAddress = await gossipAgent.radioFilter.fetchOperatorIndexer(
+        operatorAddress
+      );
+      expect(indexerAddress).toBeDefined();
+    });
 
-    // // test the observer
-    //   test("Observer prepare attestations", async () => {
-    //     const encodedMessage = await gossipAgent.messenger.writeMessage({
-    //       radioPayload: rawMessage_okay,
-    //       types,
-    //       block,
-    //     });
-    //     // first message always fails
-    //     expect(
-    //       await gossipAgent.observer.readMessage({
-    //         msg: encodedMessage,
-    //         topic: "topic",
-    //         types,
-    //       })
-    //     ).toBeUndefined();
+    // test the observer
+    test("Observer prepare attestations", async () => {
+      const encodedMessage = await gossipAgent.messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
+      const args = {
+        msg: encodedMessage,
+        topic: "topic",
+        types,
+      };
 
-    //     // later message with a higher nonce...
-    //     Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
-    //     const encodedMessage2 = await gossipAgent.messenger.writeMessage({
-    //       radioPayload: rawMessage_okay,
-    //       types,
-    //       block,
-    //     });
-    //     expect(
-    //       await gossipAgent.observer.readMessage({
-    //         msg: encodedMessage2,
-    //         topic: "topic",
-    //         types,
-    //       })
-    //     ).toBeDefined();
+      // can read message
+      const openedMessage = await gossipAgent.observer.readMessage(args);
+      expect(openedMessage).toHaveProperty(
+        "radioPayload",
+        JSON.stringify(rawMessage_okay)
+      );
+      expect(openedMessage).toHaveProperty(
+        "sender",
+        "0x2bc5349585cbbf924026d25a520ffa9e8b51a39b"
+      );
+      // but cannot process because it is the first message
+      expect(await gossipAgent.processMessage(args)).toBeUndefined();
 
-    //     // tries to inject to the past
-    //     Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
-    //     const encodedMessage3 = await gossipAgent.messenger.writeMessage({
-    //       radioPayload: rawMessage_okay,
-    //       types,
-    //       block,
-    //     });
-    //     expect(
-    //       await gossipAgent.observer.readMessage({
-    //         msg: encodedMessage3,
-    //         topic: "topic",
-    //         types,
-    //       })
-    //     ).toBeUndefined();
-    //   });
+      // later message with a higher nonce...
+      Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
+      const encodedMessage2 = await gossipAgent.messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
+      expect(
+        await gossipAgent.observer.readMessage({
+          msg: encodedMessage2,
+          topic: "topic",
+          types,
+        })
+      ).toBeDefined();
+
+      // tries to inject to the past
+      Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
+      const encodedMessage3 = await gossipAgent.messenger.writeMessage({
+        radioPayload: rawMessage_okay,
+        types,
+        block,
+      });
+      expect(
+        await gossipAgent.processMessage({
+          msg: encodedMessage3,
+          topic: "topic",
+          types,
+        })
+      ).toBeUndefined();
+    });
   });
 });

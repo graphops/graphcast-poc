@@ -15,9 +15,9 @@
     "jsonBody": {
       "data": {
         "graphAccount": {
-          "gossipOperatorOf": [
-            { "id": "0xca7bf17a80009928547bb0392ee279d03561d9e1" }
-          ]
+          "gossipOperatorOf": {
+            "id": "0xca7bf17a80009928547bb0392ee279d03561d9e1"
+          }
         }
       }
     },
