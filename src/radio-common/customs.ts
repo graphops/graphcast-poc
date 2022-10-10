@@ -32,15 +32,6 @@ export default class RadioFilter {
     this.registry = registry;
   }
 
-  public async isOperatorOf(sender: string) {
-    const res = await this.fetchOperatorOfIndexers(sender);
-    return res ? res[0] : "";
-  }
-
-  public async isOperator(sender: string) {
-    return (await this.isOperatorOf(sender)).length !== 0;
-  }
-
   public async indexerCheck(address: string) {
     const senderStake = await this.fetchStake(address);
 
@@ -104,7 +95,7 @@ export default class RadioFilter {
     const { sender, topic, nonce, blockHash, block } = args;
 
     // Resolve signer to indexer identity and check stake and dispute statuses
-    const indexerAddress = await this.isOperatorOf(sender);
+    const indexerAddress = await this.fetchOperatorIndexer(sender);
     if (!indexerAddress) {
       this.logger.warn(`👮 Sender not an operator, drop message`.red, {
         sender,
@@ -149,7 +140,7 @@ export default class RadioFilter {
     return senderStake;
   }
 
-  async fetchOperators(address: string): Promise<string[]> {
+  async fetchOperator(address: string): Promise<string[]> {
     try {
       const result = await this.registry
         .query(indexerOperatorQuery, { address })
@@ -157,16 +148,16 @@ export default class RadioFilter {
       if (result.error) {
         throw result.error;
       }
-      return result.data.indexer.account.gossipOperators;
+      return result.data.indexer.account.gossipOperator;
     } catch (error) {
-      this.logger.warn(`No operators fetched, assume none`, {
+      this.logger.warn(`No operator fetched, assume none`, {
         error: error.message,
       });
       return [];
     }
   }
 
-  async fetchOperatorOfIndexers(address: string) {
+  async fetchOperatorIndexer(address: string) {
     try {
       const result = await this.registry
         .query(operatorOfIndexerQuery, { address })
@@ -174,9 +165,7 @@ export default class RadioFilter {
       if (result.error) {
         throw result.error;
       }
-      return result.data.graphAccount.gossipOperatorOf.map((account) => {
-        return account.id;
-      });
+      return result.data.graphAccount.gossipOperatorOf.id;
     } catch (error) {
       this.logger.warn(
         `Did not find corresponding indexer address for the gossip operator`,

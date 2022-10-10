@@ -39,7 +39,7 @@ export class GossipAgent {
     this.messenger.init(this.logger, this.waku, this.clientManager);
     await this.observer.init(this.logger, this.waku, this.clientManager);
 
-    return this.radioFilter.isOperatorOf(
+    return this.radioFilter.fetchOperatorIndexer(
       this.clientManager.ethClient.getAddress().toLowerCase()
     );
   }
@@ -63,9 +63,7 @@ export class GossipAgent {
       return;
     }
 
-    this.logger.debug(
-      `\n✅ Valid message!\nSender: ${sender}\nNonce(unix): ${nonce}\nBlock: ${blockNumber}`
-    );
+    this.logger.debug(`✅ Valid message!`, { sender, nonce, blockNumber });
 
     return {
       radioPayload,
