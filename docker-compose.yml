@@ -1,15 +1,18 @@
 version: "3.8"
 
 services:
-  indexer-1:
+  real-world-indexer:
     build:
       context: .
       dockerfile: ./Dockerfile
     command: node poi-crosschecker.js
+    links:
+    - wiremock
     env_file:
       - .env
     environment:
       - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
+      - TEST_TOPIC="QmbaLc7fEfLGUioKWehRhq838rRzeR8cBoapNJWNSAZE8u"
 
   wiremock:
     image: wiremock/wiremock

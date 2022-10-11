@@ -1,3 +1,5 @@
+import { diff } from "deep-object-diff";
+
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
 
@@ -27,6 +29,9 @@ const npoisCheck = () => {
       } else {
         console.log("Tests: Here's the DB content:");
         console.log(rows);
+
+        console.log("Comparing...");
+        console.log(diff(rows, JSON.parse(JSON.stringify(rows))));
       }
     }
   );

@@ -168,19 +168,19 @@ const run = async () => {
   clientManager.ethClient.provider.on("block", async (block) => {
     console.log(`🔗 ${block}`);
 
-    if (block % 10 === 0) {
+    if (block % 5 === 0) {
       console.log("🗑️ Cleaning DB.");
       db.run("DELETE FROM npois");
       // Going 5 blocks back as a buffer to make sure the node is fully synced
       sendNPOIs(block - 5, deploymentIPFSs);
-      compareBlock = block + 5;
+      compareBlock = block + 3;
     }
 
     if (block == compareBlock) {
       console.log("🔬 Comparing remote nPOIs with local nPOIs...".blue);
 
       const divergedDeployments = processAttestations(
-        block - 10,
+        block - 8,
         operatorAddress,
         db
       );

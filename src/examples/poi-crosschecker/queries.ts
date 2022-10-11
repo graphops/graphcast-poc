@@ -92,30 +92,27 @@ export async function updateCostModel(client: Client, costModel: CostModel) {
   }
 }
 
-export const poiQuery = (
-  subgraph: string,
-  block: number,
-  hash: string,
-  indexer?: string
-) => {
-  if (indexer) {
-    return gql`
+export const poiQuery = (subgraph: string, block: number, hash: string) => {
+  console.log("INSIDE poiQuery");
+  console.log(subgraph);
+
+  console.log(
+    `
       {
         proofOfIndexing(
-          subgraph:"${subgraph}",
+          subgraph: ${subgraph},
           blockNumber:${block},
-          blockHash: "${hash}",
-          indexer: "${indexer}"
+          blockHash:"${hash}"
         ) 
       }
-      `;
-  }
+      `
+  );
   return gql`
       {
         proofOfIndexing(
-          subgraph:"${subgraph}",
+          subgraph: ${subgraph.toString()},
           blockNumber:${block},
-          blockHash: "${hash}",
+          blockHash:"${hash}"
         ) 
       }
       `;
@@ -125,18 +122,25 @@ export async function fetchPOI(
   client: Client,
   subgraph: string,
   block: number,
-  hash: string,
-  indexer?: string
+  hash: string
 ) {
+  console.log("SUBGRAPH");
+  console.log(subgraph);
   try {
-    const result = indexer
-      ? await client.query(poiQuery(subgraph, block, hash, indexer)).toPromise()
-      : await client.query(poiQuery(subgraph, block, hash)).toPromise();
+    // Hotfix for weird ENUM issue
+    subgraph = subgraph.includes("(") ? subgraph.substring(subgraph.indexOf("("), subgraph.indexOf(")")) : subgraph;
+    console.log("DID IT WORK");
+    console.log(subgraph);
+
+    const result = await client
+      .query(poiQuery(subgraph.toString(), block, hash))
+      .toPromise();
     if (result.error) {
       throw result.error;
     }
     return result.data.proofOfIndexing;
   } catch (error) {
+    console.log(error);
     console.warn(
       `⚠️ No POI fetched from the graph node for subgraph ${subgraph}.`.yellow,
       { error: error.message }

@@ -129,17 +129,17 @@ export default class RadioFilter {
       });
       return 0;
     }
-    if (this.inconsistentNonce(sender, topic, nonce)) {
-      console.warn(
-        `👮 Inconsistent nonce or first time sender, drop message`.red,
-        {
-          sender,
-          topic,
-          nonce,
-        }
-      );
-      return 0;
-    }
+    // if (this.inconsistentNonce(sender, topic, nonce)) {
+    //   console.warn(
+    //     `👮 Inconsistent nonce or first time sender, drop message`.red,
+    //     {
+    //       sender,
+    //       topic,
+    //       nonce,
+    //     }
+    //   );
+    //   return 0;
+    // }
     return senderStake;
   }
 }
