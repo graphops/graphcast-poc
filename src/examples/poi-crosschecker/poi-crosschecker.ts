@@ -8,7 +8,7 @@ import { createLogger } from "@graphprotocol/common-ts";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
-const dbName = "/usr/app/poi_crosschecker.db";
+const dbName = "/usr/app/dist/src/examples/poi-crosschecker/npois.db";
 
 const RADIO_PAYLOAD_TYPES = [
   { name: "subgraph", type: "string" },
@@ -120,8 +120,7 @@ const run = async () => {
         gossipAgent.clientManager.graphNodeStatus,
         ipfsHash,
         block,
-        blockObject.hash,
-        indexerAddress
+        blockObject.hash
       );
 
       if (!localPOI) {
@@ -143,6 +142,23 @@ const run = async () => {
       });
 
       logger.debug(`📬 Wrote and encoded message, sending`);
+
+      const selfStake = await gossipAgent.radioFilter.indexerCheck(
+        indexerAddress
+      );
+
+      db.serialize(() => {
+        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        stmt.run(
+          ipfsHash,
+          block,
+          localPOI,
+          gossipAgent.clientManager.ethClient.getAddress(),
+          selfStake
+        );
+        stmt.finalize();
+      });
+
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
         `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
@@ -192,6 +208,7 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
+      console.log("🗑️ Cleaning DB.");
       db.run("DELETE FROM npois");
     }
   });

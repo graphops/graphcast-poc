@@ -6,6 +6,8 @@ services:
       context: .
       dockerfile: ./Dockerfile
     command: node poi-crosschecker.js
+    links:
+    - wiremock
     env_file:
       - .env
     environment:

@@ -9,13 +9,12 @@ RUN npm install
 
 COPY . .
 RUN npm run build
-RUN sqlite3 /usr/app/poi_crosschecker.db "VACUUM;"
+RUN sqlite3 /usr/app/dist/src/examples/poi-crosschecker/npois.db "VACUUM;"
 
 WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 
 ENV TERM "xterm-256color"
-ENV ETH_NODE "<ETH_NODE>"
 ENV LOG_LEVEL "trace"
-ENV TEST_TOPIC "QmeccoXogKyEBBewvfwK7D391XzdnkBkLmEboXE9cE9X8N"
+ENV ETH_NODE "<ETH_NODE>"
 
 CMD node poi-crosschecker.js
