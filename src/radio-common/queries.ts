@@ -16,7 +16,7 @@ export const indexerOperatorQuery = gql`
   query indexer($address: String!) {
     indexer(id: $address) {
       account {
-        gossipOperators {
+        gossipOperator {
           id
         }
       }

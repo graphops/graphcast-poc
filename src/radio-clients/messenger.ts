@@ -41,7 +41,7 @@ export class Messenger {
       return message.encode();
     } catch (error) {
       throw Error(
-        `Cannot write and encode the message, check formatting\n` + error
+        `Cannot write and encode the message, check formatting: ` + error
       );
     }
   }
