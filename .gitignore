@@ -3,5 +3,6 @@ dist
 *.env
 .envrc
 coverage
-*.sh
 .eslintcache
+*.log
+.editorconfig

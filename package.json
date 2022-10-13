@@ -10,7 +10,8 @@
     "watch": "tsc-watch --onSuccess \"npm start\"",
     "test": "jest --colors --verbose --forceExit",
     "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test.integration": "bash src/examples/poi-crosschecker/tests/integration/scripts/compare-attestations.sh"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",
@@ -35,6 +36,8 @@
     "@types/isomorphic-fetch": "0.0.35",
     "@types/sqlite3": "^3.1.8",
     "colors": "^1.4.0",
+    "deep-diff": "^1.0.2",
+    "deep-object-diff": "^1.1.7",
     "dotenv": "^16.0.1",
     "ethers": "^5.6.9",
     "graphql": "^16.5.0",
