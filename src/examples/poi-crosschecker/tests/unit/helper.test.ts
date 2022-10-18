@@ -20,14 +20,9 @@ const setup = async () => {
 
   db = new sqlite3.Database(":memory:", [sqlite3.OPEN_READWRITE])
   db.run(
-    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
+    "CREATE TABLE IF NOT EXISTS poi_crosschecker (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
   );
-
-  await db.serialize(() => {
-    const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-    addStmt.run("Qmaaa", 0, "0x0", "operator1", 1);
-    addStmt.finalize();
-  });
+  db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 0, "0x0", "operator1", 1]);
 };
 
 const teardown = async () => {
@@ -49,11 +44,7 @@ describe("Radio helpers", () => {
       expect(diverged).toHaveLength(0);
 
       // another operator at different block, no diverged
-      await db.serialize(() => {
-        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        addStmt.run("Qmaaa", 1, "0x0", "operator2", 1);
-        addStmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 1, "0x0", "operator2", 1]);
       const diverged2 = processAttestations(
         logger,
         1,
@@ -63,11 +54,7 @@ describe("Radio helpers", () => {
       expect(diverged2).toHaveLength(0);
 
       // another operator with same nPOI, no diverged
-      await db.serialize(() => {
-        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        addStmt.run("Qmaaa", 0, "0x0", "operator2", 1);
-        addStmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 0, "0x0", "operator2", 1]);
       const diverged3 = processAttestations(
         logger,
         1,
@@ -78,11 +65,8 @@ describe("Radio helpers", () => {
     
     test("add attacks", async () => {
       // different block
-      await db.serialize(() => {
-        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        addStmt.run("Qmaaa", 1, "0x1", "operator2", 1);
-        addStmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 1, "0x1", "operator2", 1]);
+      
       const diverged = processAttestations(
         logger,
         1,
@@ -91,11 +75,8 @@ describe("Radio helpers", () => {
       expect(diverged).toHaveLength(0);
 
       // same block, weak stake attack => no diverge
-      await db.serialize(() => {
-        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        addStmt.run("Qmaaa", 0, "0x1", "operator2", 1);
-        addStmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 0, "0x1", "operator2", 1]);
+      
       const diverged2 = processAttestations(
         logger,
         1,
@@ -104,11 +85,7 @@ describe("Radio helpers", () => {
       expect(diverged2).toHaveLength(0);
 
       // same block, strong friend => no diverge
-      await db.serialize(() => {
-        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        addStmt.run("Qmaaa", 0, "0x1", "operator2", 2);
-        addStmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", ["Qmaaa", 0, "0x1", "operator2", 2]);
 
       const diverged3 = processAttestations(
         logger,

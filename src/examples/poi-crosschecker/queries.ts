@@ -8,9 +8,7 @@ export const indexerAllocationsQuery = gql`
   query indexer($address: String!) {
     indexer(id: $address) {
       allocations {
-        allocatedTokens
         subgraphDeployment {
-          id
           ipfsHash
         }
       }
@@ -18,7 +16,7 @@ export const indexerAllocationsQuery = gql`
   }
 `;
 
-export async function fetchAllocations(
+export async function fetchAllocatedDeployments(
   logger: Logger,
   client: Client,
   address: string
@@ -31,7 +29,7 @@ export async function fetchAllocations(
       logger.warn(`Failed to fetch allocations`, { err: result.error });
       throw new Error(result.error.message);
     }
-    return result.data.indexer.allocations;
+    return result.data.indexer.allocations.map(a => a.subgraphDeployment.ipfsHash);
   } catch (error) {
     logger.warn(`No allocation fetched, check connection and address`, {
       error: error.message,

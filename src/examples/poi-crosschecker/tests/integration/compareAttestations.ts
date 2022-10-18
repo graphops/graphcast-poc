@@ -19,7 +19,7 @@ const compareAttestations = () => {
   });
 
   const db = new sqlite3.Database(
-    "/usr/app/dist/src/examples/poi-crosschecker/npois.db",
+    "/usr/app/dist/src/examples/poi-crosschecker/poi_crosschecker.db",
     sqlite3.OPEN_READ,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any) => {
@@ -30,7 +30,7 @@ const compareAttestations = () => {
   );
 
   db.all(
-    "SELECT subgraph, block, nPOI FROM npois",
+    "SELECT subgraph, block, nPOI FROM poi_crosschecker",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, records: AbstractNPOIRecord[]) => {
       if (err) {

@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "Starting integration tests..."
 touch ./db.log
-docker exec -it graphcast-poc-indexer-1-1 sqlite3 npois.db "select * from npois;" ".exit" >./db.log
+docker exec -it graphcast-poc-indexer-1-1 sqlite3 poi_crosschecker.db "select * from poi_crosschecker;" ".exit" >./db.log
 
 if [ -s ./db.log ]; then
     docker exec -it graphcast-poc-indexer-1-1 node tests/integration/compareAttestations.js
