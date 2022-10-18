@@ -20,7 +20,7 @@ export class GraphcastMessage {
     .add(new Field("signature", 5, "string"));
 
   public static domain = {
-    name: `graphcast-poi-crosschecker`,
+    name: `graphcast`,
     version: "0",
   };
 

@@ -15,11 +15,13 @@ export class GossipAgent {
   registry: Client;
   radioFilter: RadioFilter;
   waku?: Waku;
+  operator?: string;
+  indexer?: string;
 
   constructor(logger: Logger, clientManager: ClientManager) {
     this.messenger = new Messenger();
     this.observer = new Observer();
-    this.logger = logger;
+    this.logger = logger.child({ component: 'gossipAgent' });
     this.clientManager = clientManager;
 
     this.registry = this.clientManager.registry;
@@ -39,9 +41,11 @@ export class GossipAgent {
     this.messenger.init(this.logger, this.waku, this.clientManager);
     await this.observer.init(this.logger, this.waku, this.clientManager);
 
-    return this.radioFilter.fetchOperatorIndexer(
-      this.clientManager.ethClient.getAddress().toLowerCase()
-    );
+    this.operator = this.clientManager.ethClient.getAddress().toLowerCase()
+    this.indexer = await this.radioFilter.fetchOperatorIndexer(
+      this.operator
+    ) 
+    return this.indexer;
   }
 
   async processMessage(args: ReadMessageArgs) {
@@ -71,5 +75,19 @@ export class GossipAgent {
       sender,
       stakeWeight,
     };
+  }
+
+  async establishTopics(radio_application, fetch, handler){
+    // can generalize fetch or make it lambda
+    const topics = await fetch(
+        this.logger,
+        this.clientManager.networkSubgraph,
+        this.indexer
+      );
+    
+    this.observer.observe(topics.map(
+      (topic: string) => `/graphcast/0/${radio_application}/${topic}/proto`
+    ), handler);
+    return topics
   }
 }
