@@ -1,5 +1,5 @@
 import { NPOIRecord } from './../../types';
-import { sortAttestations } from './../../utils';
+import { sleep, sortAttestations } from './../../utils';
 import { createLogger, Logger } from "@graphprotocol/common-ts";
 import { processAttestations } from "../../utils";
 
@@ -116,8 +116,9 @@ describe("Radio helpers", () => {
         "operator1",
         db
       )
-      // TODO: DOUBLE CHECK WHY THIS ONE DELAYS SOMETIMES
-      // expect(diverged3).toHaveLength(1);
+
+      await sleep(10);
+      expect(diverged3).toHaveLength(1);
     });
   });
   describe("Sort attestations", () => {

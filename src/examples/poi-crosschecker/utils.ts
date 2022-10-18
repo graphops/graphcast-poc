@@ -12,7 +12,7 @@ export const processAttestations = (
   operator: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any
-) : string[] => {
+): string[] => {
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
@@ -90,4 +90,8 @@ export const sortAttestations = (records: NPOIRecord[]) => {
 
   const sorted = groups.sort((a, b) => Number(b.stakeWeight - a.stakeWeight));
   return sorted;
+};
+
+export const sleep = (ms: number) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
