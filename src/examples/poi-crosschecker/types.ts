@@ -24,5 +24,5 @@ export type NPOIRecord = {
   block: number;
   nPOI: string;
   operator: string;
-  stakeWeight: bigint;
+  stakeWeight: number;
 };

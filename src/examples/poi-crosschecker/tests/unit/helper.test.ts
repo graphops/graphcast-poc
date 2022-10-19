@@ -1,172 +1,166 @@
-import { createLogger } from "@graphprotocol/common-ts";
-import { ClientManager } from "../../../../radio-clients/clientManager";
-import { GossipAgent } from "./../../../../radio-clients/gossipAgent";
+import { NPOIRecord } from './../../types';
+import { sleep, sortAttestations } from './../../utils';
+import { createLogger, Logger } from "@graphprotocol/common-ts";
+import { processAttestations } from "../../utils";
 
-declare const ETH_NODE: string;
-declare const RADIO_OPERATOR_PRIVATE_KEY: string;
-declare const NETWORK_SUBGRAPH: string;
-declare const GRAPH_NODE: string;
-declare const INDEXER_MANAGEMENT_SERVER: string;
-declare const REGISTRY_SUBGRAPH: string;
+/* eslint-disable @typescript-eslint/no-var-requires */
+const sqlite3 = require("sqlite3").verbose();
 
-let block: { number: number; hash: string };
-let gossipAgent: GossipAgent;
-let rawMessage_okay: { nPOI: string; subgraph: string };
-let types: Array<{
-  name: string;
-  type: string;
-}>;
+let logger: Logger;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let db: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 
 const setup = async () => {
-  jest.spyOn(console, "error").mockImplementation(jest.fn());
-  const logger = createLogger({
+  logger = createLogger({
     name: `poi-crosschecker`,
     async: false,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     level: "fatal",
   });
 
-  const clientManager = new ClientManager({
-    operatorPrivateKey: process.env.RADIO_OPERATOR_PRIVATE_KEY,
-    ethNodeUrl: process.env.ETH_NODE,
-    registry: process.env.REGISTRY_SUBGRAPH,
-    graphNodeStatus: process.env.GRAPH_NODE,
-    indexerManagementServer: process.env.INDEXER_MANAGEMENT_SERVER,
-    graphNetworkUrl: process.env.NETWORK_SUBGRAPH,
+  db = new sqlite3.Database(":memory:", [sqlite3.OPEN_READWRITE])
+  db.run(
+    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
+  );
+
+  await db.serialize(() => {
+    const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+    addStmt.run("Qmaaa", 0, "0x0", "operator1", 1);
+    addStmt.finalize();
   });
-
-  gossipAgent = new GossipAgent(logger, clientManager);
-  await gossipAgent.init();
-
-  // Mocks
-  Date.now = jest.fn(() => new Date().getTime() - 3_500_000);
-  block = {
-    number: 1,
-    hash: "0x0001",
-  };
-  gossipAgent.clientManager.ethClient.buildBlock = jest.fn(async (number) => {
-    return {
-      number: number,
-      hash: "0x000" + number,
-    };
-  });
-
-  rawMessage_okay = {
-    subgraph: "Qmaaa",
-    nPOI: "poi0",
-  };
-
-  types = [
-    { name: "subgraph", type: "string" },
-    { name: "nPOI", type: "string" },
-  ];
 };
 
-describe("Messenger and Observer helpers", () => {
+const teardown = async () => {
+  await db.close()
+}
+
+describe("Radio helpers", () => {
   beforeAll(setup);
-  describe("Write and Observe", () => {
-    test("write and observe a message - success", async () => {
-      const encodedMessage = await gossipAgent.messenger.writeMessage({
-        radioPayload: rawMessage_okay,
-        types,
-        block,
+  afterAll(teardown);
+  describe("Process attestations", () => {
+    // no divergence, and if tweak any of attestations we should catch divergence
+    test("single local record", async () => {
+      const targetBlock = 0
+      const diverged = processAttestations(
+        logger,
+        targetBlock,
+        "operator1",
+        db)
+      expect(diverged).toHaveLength(0);
+
+      // another operator at different block, no diverged
+      await db.serialize(() => {
+        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        addStmt.run("Qmaaa", 1, "0x0", "operator2", 1);
+        addStmt.finalize();
       });
-      expect(encodedMessage).toBeDefined();
+      const diverged2 = processAttestations(
+        logger,
+        1,
+        "operator1",
+        db)
 
-      const message = gossipAgent.observer._decodeMessage(
-        encodedMessage,
-        types
-      );
+      expect(diverged2).toHaveLength(0);
 
-      expect(message).toBeDefined();
-      expect(Number(message.blockNumber)).toEqual(block.number);
-      expect(JSON.parse(message.radioPayload).nPOI).toEqual(
-        rawMessage_okay.nPOI
-      );
+      // another operator with same nPOI, no diverged
+      await db.serialize(() => {
+        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        addStmt.run("Qmaaa", 0, "0x0", "operator2", 1);
+        addStmt.finalize();
+      });
+      const diverged3 = processAttestations(
+        logger,
+        1,
+        "operator1",
+        db)
+      expect(diverged3).toHaveLength(0);
     });
+    
+    test("add attacks", async () => {
+      // different block
+      await db.serialize(() => {
+        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        addStmt.run("Qmaaa", 1, "0x1", "operator2", 1);
+        addStmt.finalize();
+      });
+      const diverged = processAttestations(
+        logger,
+        1,
+        "operator1",
+        db)
+      expect(diverged).toHaveLength(0);
 
-    test("write a message - wrong protobuf format", async () => {
-      const rawMessage_bad = {
-        deployment: "withoutPOI",
-      };
-      await expect(
-        async () =>
-          await gossipAgent.messenger.writeMessage({
-            radioPayload: rawMessage_bad,
-            types,
-            block,
-          })
-      ).rejects.toThrowError(
-        `Cannot write and encode the message, check formatting`
-      );
+      // same block, weak stake attack => no diverge
+      await db.serialize(() => {
+        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        addStmt.run("Qmaaa", 0, "0x1", "operator2", 1);
+        addStmt.finalize();
+      });
+      const diverged2 = processAttestations(
+        logger,
+        1,
+        "operator1",
+        db)
+      expect(diverged2).toHaveLength(0);
+
+      // same block, strong friend => no diverge
+      await db.serialize(() => {
+        const addStmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        addStmt.run("Qmaaa", 0, "0x1", "operator2", 2);
+        addStmt.finalize();
+      });
+
+      const diverged3 = processAttestations(
+        logger,
+        0,
+        "operator1",
+        db
+      )
+
+      await sleep(10);
+      expect(diverged3).toHaveLength(1);
     });
-
-    test("Gossip agent registry check", async () => {
-      const operatorAddress = gossipAgent.clientManager.ethClient
-        .getAddress()
-        .toLowerCase();
-
-      const indexerAddress = await gossipAgent.radioFilter.fetchOperatorIndexer(
-        operatorAddress
-      );
-      expect(indexerAddress).toBeDefined();
-    });
-
-    // test the observer
-    test("Observer prepare attestations", async () => {
-      const encodedMessage = await gossipAgent.messenger.writeMessage({
-        radioPayload: rawMessage_okay,
-        types,
-        block,
-      });
-      const args = {
-        msg: encodedMessage,
-        topic: "topic",
-        types,
-      };
-
-      // can read message
-      const openedMessage = await gossipAgent.observer.readMessage(args);
-      expect(openedMessage).toHaveProperty(
-        "radioPayload",
-        JSON.stringify(rawMessage_okay)
-      );
-      expect(openedMessage).toHaveProperty(
-        "sender",
-        "0x2bc5349585cbbf924026d25a520ffa9e8b51a39b"
-      );
-      // but cannot process because it is the first message
-      expect(await gossipAgent.processMessage(args)).toBeUndefined();
-
-      // later message with a higher nonce...
-      Date.now = jest.fn(() => new Date().getTime() - 3_400_000);
-      const encodedMessage2 = await gossipAgent.messenger.writeMessage({
-        radioPayload: rawMessage_okay,
-        types,
-        block,
-      });
-      expect(
-        await gossipAgent.observer.readMessage({
-          msg: encodedMessage2,
-          topic: "topic",
-          types,
-        })
-      ).toBeDefined();
-
-      // tries to inject to the past
-      Date.now = jest.fn(() => new Date().getTime() - 7_200_000);
-      const encodedMessage3 = await gossipAgent.messenger.writeMessage({
-        radioPayload: rawMessage_okay,
-        types,
-        block,
-      });
-      expect(
-        await gossipAgent.processMessage({
-          msg: encodedMessage3,
-          topic: "topic",
-          types,
-        })
-      ).toBeUndefined();
+  });
+  describe("Sort attestations", () => {
+    test("Normalcy - no POI divergence", async () => {
+      const records:NPOIRecord[] = [
+        {subgraph: "Qmaaa",
+        block: 0,
+        nPOI: "0x0",
+        operator: "operator0",
+        stakeWeight: 5},
+        {subgraph: "Qmaaa",
+        block: 0,
+        nPOI: "0x1",
+        operator: "operator1",
+        stakeWeight: 3},
+        {subgraph: "Qmaaa",
+        block: 0,
+        nPOI: "0x0",
+        operator: "operator2",
+        stakeWeight: 3}
+      ]
+      let sorted = sortAttestations(records)
+      expect(sorted[0].nPOI).toEqual("0x0")
+      expect(sorted[0].stakeWeight).toEqual(8)
+      
+      records.push({subgraph: "Qmaaa",
+        block: 0,
+        nPOI: "0x2",
+        operator: "operator2",
+        stakeWeight: 6})
+      sorted = sortAttestations(records)
+      expect(sorted[0].nPOI).toEqual("0x0")
+      expect(sorted[0].stakeWeight).toEqual(8)
+      
+      records.push({subgraph: "Qmaaa",
+        block: 0,
+        nPOI: "0x5",
+        operator: "operator2",
+        stakeWeight: 9})
+      sorted = sortAttestations(records)
+      expect(sorted[0].nPOI).toEqual("0x5")
+      expect(sorted[0].stakeWeight).toEqual(9)  
     });
   });
 });

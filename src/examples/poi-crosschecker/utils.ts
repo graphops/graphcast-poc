@@ -5,13 +5,14 @@ import { Logger } from "@graphprotocol/common-ts";
 
 export const defaultModel = "default => 100000;";
 
+// TODO: update operator field in db to indexer
 export const processAttestations = (
   logger: Logger,
   targetBlock: number,
   operator: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any
-) => {
+): string[] => {
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
@@ -25,59 +26,51 @@ export const processAttestations = (
 
       const localNPOIs = rows.filter((record) => record.operator === operator);
 
-      logger.debug("🔎 POIs", { localNPOIs, allnPOIs: rows });
+      logger.debug("🔎 POIs", { localNPOIs, allnPOIs: rows, targetBlock });
 
-      if (localNPOIs.length > 0) {
-        localNPOIs.forEach((record) => {
-          const { subgraph, nPOI } = record;
+      localNPOIs.forEach((record) => {
+        const attestedNPOIs = rows.filter(
+          (attested) => attested.subgraph === record.subgraph
+        );
 
-          // This check should include excluding our own attestations, but leaving it for now for ease of testing
-          const remoteNPOIs = rows.filter(
-            (record) => record.subgraph === subgraph
+        if (attestedNPOIs === undefined || attestedNPOIs.length === 0) {
+          logger.debug(
+            `No remote attestations for ${record.subgraph} on block ${targetBlock} at the moment.`
           );
+          return [];
+        }
 
-          if (remoteNPOIs === undefined || remoteNPOIs.length === 0) {
-            logger.debug(
-              `No remote attestations for ${subgraph} on block ${targetBlock} at the moment.`
-            );
-            return [];
-          }
-
-          const topAttestation = sortAttestations(remoteNPOIs)[0];
-          logger.info(`📒 Attestation check`, {
-            subgraph,
-            block: targetBlock,
-            remoteNPOIs,
-            mostStaked: topAttestation.nPOI,
-            indexerAddresses: topAttestation.operators,
-            nPOI,
-          });
-
-          if (topAttestation.nPOI === nPOI) {
-            logger.debug(
-              `✅ POIs match for subgraphDeployment ${subgraph} on block ${targetBlock}.`
-            );
-          } else {
-            //Q: is expensive query definitely the way to go? what if attacker purchase a few of these queries, could it lead to dispute?
-            //But I guess they cannot specifically buy as queries go through ISA
-            logger.warn(
-              `❌ POIS do not match, updating cost model to block off incoming queries`
-            );
-            // Cost model schema used byte32 representation of the deployment hash
-            divergedDeployments.push(
-              Buffer.from(bs58.decode(subgraph))
-                .toString("hex")
-                .replace("1220", "0x")
-            );
-          }
+        const topAttestation = sortAttestations(attestedNPOIs)[0];
+        logger.info(`📒 Attestation check`, {
+          subgraph: record.subgraph,
+          block: targetBlock,
+          attestedNPOIs,
+          mostStaked: topAttestation.nPOI,
+          indexerAddresses: topAttestation.operators,
+          nPOI: record.nPOI,
         });
-      }
+
+        if (topAttestation.nPOI === record.nPOI) {
+          logger.debug(
+            `✅ POIs match for subgraphDeployment ${record.subgraph} on block ${targetBlock}.`
+          );
+        } else {
+          logger.warn(
+            `❌ POIS do not match, updating cost model to block off incoming queries`
+          );
+          // Cost model schema used byte32 representation of the deployment hash
+          divergedDeployments.push(
+            Buffer.from(bs58.decode(record.subgraph))
+              .toString("hex")
+              .replace("1220", "0x")
+          );
+        }
+      });
     }
   );
   return divergedDeployments;
 };
 
-//TODO: modify attestation types
 export const sortAttestations = (records: NPOIRecord[]) => {
   const groups = [];
   records.forEach((record: NPOIRecord) => {
@@ -97,4 +90,8 @@ export const sortAttestations = (records: NPOIRecord[]) => {
 
   const sorted = groups.sort((a, b) => Number(b.stakeWeight - a.stakeWeight));
   return sorted;
+};
+
+export const sleep = (ms: number) => {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 };
