@@ -1,5 +1,7 @@
 import { createLogger } from "@graphprotocol/common-ts";
 import diff from "deep-diff";
+import { ethers } from "ethers";
+import { sleep } from "../../utils";
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const sqlite3 = require("sqlite3").verbose();
@@ -10,7 +12,9 @@ type AbstractNPOIRecord = {
   nPOI: string;
 };
 
-const compareAttestations = () => {
+const compareAttestations = async () => {
+  const provider = new ethers.providers.JsonRpcProvider(process.env.ETH_NODE);
+
   const logger = createLogger({
     name: `poi-crosschecker-integration-tests`,
     async: false,
@@ -24,15 +28,54 @@ const compareAttestations = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any) => {
       if (err) {
-        console.log(JSON.stringify({ error: err.message }, null, "\t"));
+        logger.error(JSON.stringify({ error: err.message }, null, "\t"));
       }
     }
   );
 
+  let block = await provider.getBlockNumber();
+  if (block % 10 === 0) {
+    logger.warning(
+      "DB clearing block. Waiting for next block before compairing... "
+    );
+
+    let newBlock = await provider.getBlockNumber();
+    while (newBlock === block) {
+      sleep(1000);
+      newBlock = await provider.getBlockNumber();
+    }
+    block = newBlock;
+  }
+
+  logger.debug("Block: " + block);
+
+  let attestationBlock = 0;
+  let occurrence = 0;
+  let prev = block;
+
+  while (occurrence < 2) {
+    prev--;
+
+    if (prev % 5 === 0) {
+      occurrence++;
+    }
+    if (occurrence === 1) {
+      attestationBlock = prev - 1;
+    }
+  }
+
+  logger.debug("Attestation block: " + attestationBlock);
+
   db.all(
-    "SELECT subgraph, block, nPOI FROM npois",
+    "SELECT subgraph, block, nPOI FROM npois WHERE block = ?",
+    attestationBlock,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, records: AbstractNPOIRecord[]) => {
+      if (records.length === 0) {
+        logger.warning("DB is empty.");
+        return;
+      }
+
       if (err) {
         logger.error(JSON.stringify({ error: err.message }, null, "\t"));
       } else {
@@ -55,4 +98,5 @@ const compareAttestations = () => {
   );
 };
 
-compareAttestations();
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+compareAttestations().then(() => {});

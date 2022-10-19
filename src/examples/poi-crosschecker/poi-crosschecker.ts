@@ -178,6 +178,9 @@ const run = async () => {
     logger.debug(`🔗 ${block}`);
 
     if (block % 5 === 0) {
+      console.log("🗑️ Cleaning DB.");
+      db.run("DELETE FROM npois");
+
       // Going 5 blocks back as a buffer to make sure the node is fully synced
       sendNPOIs(block - 5, deploymentIPFSs);
       compareBlock = block + 3;
@@ -208,8 +211,6 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
-      console.log("🗑️ Cleaning DB.");
-      db.run("DELETE FROM npois");
     }
   });
 };
