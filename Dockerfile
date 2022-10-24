@@ -9,7 +9,7 @@ RUN npm install
 
 COPY . .
 RUN npm run build
-RUN sqlite3 /usr/app/dist/src/examples/poi-crosschecker/npois.db "VACUUM;"
+RUN sqlite3 /usr/app/dist/src/examples/poi-crosschecker/poi_crosschecker.db "VACUUM;"
 
 WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 

@@ -37,27 +37,25 @@ export const compareAttestations = async (logger: Logger) => {
         const closestNonce = nonces.find((n) => timestamp - n === smallestDiff);
         logger.debug(`Closest nonce: ${closestNonce}`);
 
-        const closestAttestation = records.find(
-          (r) => (r.nonce = closestNonce)
-        );
+  const db = new sqlite3.Database(
+    "/usr/app/dist/src/examples/poi-crosschecker/npois.db",
+    sqlite3.OPEN_READ,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any) => {
+      if (err) {
+        console.log(JSON.stringify({ error: err.message }, null, "\t"));
+      }
+    }
+  );
 
-        logger.debug(`Attestation block: ${closestAttestation.block}`);
-
-        records = records.filter((r) => r.block === closestAttestation.block);
-        logger.debug(`Records length: ${records.length}`);
-
-        const stripped = records.map((r) => {
-          return {
-            subgraph: r.subgraph,
-            block: r.block,
-            nPOI: r.nPOI,
-          };
-        });
-
-        if (err) {
-          logger.error(JSON.stringify({ error: err.message }, null, "\t"));
-        } else {
-          const outerDiffs = [];
+  db.all(
+    "SELECT subgraph, block, nPOI FROM npois",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any, records: AbstractNPOIRecord[]) => {
+      if (err) {
+        logger.error(JSON.stringify({ error: err.message }, null, "\t"));
+      } else {
+        const outerDiffs = [];
 
           for (let i = 0; i < stripped.length - 1; i++) {
             const innerDiffs = diff(stripped[i], stripped[i + 1]);

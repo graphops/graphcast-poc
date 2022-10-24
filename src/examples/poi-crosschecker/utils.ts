@@ -19,7 +19,7 @@ export const processAttestations = (
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
-    "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM npois WHERE block = ?",
+    "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM poi_crosschecker WHERE block = ?",
     targetBlock,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, rows: NPOIRecord[]) => {

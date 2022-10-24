@@ -2,42 +2,43 @@ import { GossipAgent } from "./../../radio-clients/gossipAgent";
 import "colors";
 import "dotenv/config";
 import { ClientManager } from "../../radio-clients/clientManager";
-import { fetchAllocations, fetchPOI, updateCostModel } from "./queries";
+import { fetchAllocatedDeployments, fetchPOI, updateCostModel } from "./queries";
 import { defaultModel, processAttestations } from "./utils";
 import { createLogger } from "@graphprotocol/common-ts";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
-const dbName = "/usr/app/dist/src/examples/poi-crosschecker/npois.db";
-
+const name = `poi_crosschecker`;
 const RADIO_PAYLOAD_TYPES = [
   { name: "subgraph", type: "string" },
   { name: "nPOI", type: "string" },
 ];
 
+
 const run = async () => {
   const logger = createLogger({
-    name: `poi-crosschecker`,
+    name,
     async: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     level: process.env.logLevel as any,
   });
 
   const db = new sqlite3.Database(
-    dbName,
+    // const dbName = "/usr/app/dist/src/examples/poi-crosschecker/npois.db";
+    `/usr/app/dist/src/examples/poi-crosschecker/${name}.db`,
     sqlite3.OPEN_READWRITE,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any) => {
       if (err) {
         logger.error(err.message);
-        throw new Error(`Failed to connect to database ${dbName}`);
+        throw new Error(`Failed to connect to database ${name}`);
       }
-      logger.info("Connected to the poi-crosschecker database.");
+      logger.info(`Connected to the ${name} database.`);
     }
   );
 
   db.run(
-    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
+    `CREATE TABLE IF NOT EXISTS ${name} (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)`
   );
 
   const clientManager = new ClientManager({
@@ -59,31 +60,8 @@ const run = async () => {
     }
   );
 
-  // Initial queries
-  const deploymentIPFSs = (
-    await fetchAllocations(
-      logger,
-      gossipAgent.clientManager.networkSubgraph,
-      indexerAddress
-    )
-  ).map((a) => a.subgraphDeployment.ipfsHash);
-  deploymentIPFSs.push(process.env.TEST_TOPIC);
-  const topics = deploymentIPFSs.map(
-    (ipfsHash: string) => `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
-  );
-  logger.info(
-    `👂 Initialize POI crosschecker for on-chain allocations with operator status:`,
-    {
-      indexerAddress:
-        indexerAddress ??
-        "Graphcast agent is not registered as an indexer operator",
-      topics,
-    }
-  );
-
   const poiHandler = async (msg: Uint8Array, topic: string) => {
     try {
-      // temporarily removed self check for easy testing
       logger.info(`📮 A new message has been received! Handling the message`);
       const message = await gossipAgent.processMessage({
         msg,
@@ -96,25 +74,33 @@ const run = async () => {
 
       logger.info(`Payload: Subgraph (ipfs hash)`, { subgraph, nPOI });
 
-      db.serialize(() => {
-        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)");
-        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight, nonce);
-        stmt.finalize();
-      });
+      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?, ?)", [subgraph, blockNumber, nPOI, sender, stakeWeight, nonce]);
+
     } catch {
       logger.warn(`Failed to handle a message into attestation, moving on`);
     }
   };
 
-  gossipAgent.observer.observe(topics, poiHandler);
+  // Topic fetcher and handler for specific radio name (need a good name)
+  const deploymentIPFSs = await gossipAgent.establishTopics(name, fetchAllocatedDeployments, poiHandler);
+
+  logger.info(
+    `👂 Initialize POI crosschecker for on-chain allocations with operator status:`,
+    {
+      indexerAddress:
+        indexerAddress ??
+        "Graphcast agent is not registered as an indexer operator",
+      topic: deploymentIPFSs,
+    }
+  );
 
   // Get nPOIs at block over deployment ipfs hashes, and send messages about the synced POIs
-  const sendNPOIs = async (block: number, DeploymentIpfses: string[]) => {
+  const sendNPOIs = async (block: number, deploymentIpfses: string[]) => {
     const blockObject =
       await gossipAgent.clientManager.ethClient.provider.getBlock(block);
     const unavailableDplymts = [];
 
-    DeploymentIpfses.forEach(async (ipfsHash) => {
+    deploymentIpfses.forEach(async (ipfsHash) => {
       const localPOI = await fetchPOI(
         logger,
         gossipAgent.clientManager.graphNodeStatus,
@@ -148,21 +134,20 @@ const run = async () => {
       );
 
       db.serialize(() => {
-        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)");
+        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
         stmt.run(
           ipfsHash,
           block,
           localPOI,
           gossipAgent.clientManager.ethClient.getAddress(),
-          selfStake,
-          Date.now()
+          selfStake
         );
         stmt.finalize();
       });
 
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
-        `/graph-gossip/0/poi-crosschecker/${ipfsHash}/proto`
+        `/graphcast/0/${name}/${ipfsHash}/proto`
       );
     });
 
@@ -213,6 +198,8 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
+      console.log("🗑️ Cleaning DB.");
+      db.run("DELETE FROM npois");
     }
   });
 };
