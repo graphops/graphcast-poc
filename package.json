@@ -13,7 +13,7 @@
     "start-mocked": "docker-compose up wiremock indexer-1 mock-indexer-1 mock-indexer-2 mock-indexer-3 mock-indexer-4 mock-indexer-5 mock-indexer-6 mock-indexer-7 mock-indexer-8",
     "test": "jest --colors --verbose --forceExit",
     "integration-tests": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests.sh",
-    "integration-tests.watch": "while :; do yarn integration-tests; done"
+    "integration-tests.watch": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests-watch.sh"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",
