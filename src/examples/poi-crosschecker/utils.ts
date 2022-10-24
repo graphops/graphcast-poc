@@ -3,6 +3,9 @@ import "colors";
 import { NPOIRecord } from "./types";
 import { Logger } from "@graphprotocol/common-ts";
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+const sqlite3 = require("sqlite3").verbose();
+
 export const defaultModel = "default => 100000;";
 
 // TODO: update operator field in db to indexer
@@ -94,4 +97,17 @@ export const sortAttestations = (records: NPOIRecord[]) => {
 
 export const sleep = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+export const openDb = (dbName: string, logger: Logger) => {
+  return new sqlite3.Database(
+    dbName,
+    sqlite3.OPEN_READ,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any) => {
+      if (err) {
+        logger.error(JSON.stringify({ error: err.message }, null, "\t"));
+      }
+    }
+  );
 };

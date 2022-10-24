@@ -70,6 +70,7 @@ export class GossipAgent {
       blockNumber,
       sender,
       stakeWeight,
+      nonce
     };
   }
 }

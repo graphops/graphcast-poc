@@ -37,7 +37,7 @@ const run = async () => {
   );
 
   db.run(
-    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
+    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
   );
 
   const clientManager = new ClientManager({
@@ -91,14 +91,14 @@ const run = async () => {
         types: RADIO_PAYLOAD_TYPES,
       });
 
-      const { radioPayload, blockNumber, sender, stakeWeight } = message;
+      const { radioPayload, blockNumber, sender, stakeWeight, nonce } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
       logger.info(`Payload: Subgraph (ipfs hash)`, { subgraph, nPOI });
 
       db.serialize(() => {
-        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight);
+        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)");
+        stmt.run(subgraph, blockNumber, nPOI, sender, stakeWeight, nonce);
         stmt.finalize();
       });
     } catch {
@@ -148,13 +148,14 @@ const run = async () => {
       );
 
       db.serialize(() => {
-        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
+        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)");
         stmt.run(
           ipfsHash,
           block,
           localPOI,
           gossipAgent.clientManager.ethClient.getAddress(),
-          selfStake
+          selfStake,
+          Date.now()
         );
         stmt.finalize();
       });
@@ -178,7 +179,8 @@ const run = async () => {
     logger.debug(`🔗 ${block}`);
 
     if (block % 5 === 0) {
-      console.log("🗑️ Cleaning DB.");
+      logger.info("🗑️ Cleaning DB.");
+
       db.run("DELETE FROM npois");
 
       // Going 5 blocks back as a buffer to make sure the node is fully synced
