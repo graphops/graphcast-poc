@@ -13,7 +13,7 @@ do
     # cat db.log
     # echo $(wc -l < db.log)
     if [ $(wc -l < db.log) -gt 2 ]; then
-        sleep 1
+        sleep 2
         docker exec -it graphcast-poc-mock-indexer-1-1 node tests/integration/integrationTests.js containers=$containers
         docker kill mock-indexer-1 
         docker rm mock-indexer-1 
