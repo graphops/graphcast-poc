@@ -24,7 +24,7 @@ const setup = async () => {
     "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
   );
 
-  await sleep(10);
+  await sleep(50);
 
   db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
     "Qmaaa",
@@ -120,7 +120,7 @@ describe("Radio helpers", () => {
 
       const diverged3 = processAttestations(logger, 0, "operator1", db);
 
-      await sleep(10);
+      await sleep(50);
       expect(diverged3).toHaveLength(1);
     });
   });
