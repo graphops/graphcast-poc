@@ -133,17 +133,12 @@ const run = async () => {
         indexerAddress
       );
 
-      db.serialize(() => {
-        const stmt = db.prepare("INSERT INTO npois VALUES (?, ?, ?, ?, ?)");
-        stmt.run(
-          ipfsHash,
+      db.run(`INSERT INTO ${name} VALUES (?, ?, ?, ?, ?)`, [ipfsHash,
           block,
           localPOI,
           gossipAgent.clientManager.ethClient.getAddress(),
           selfStake
-        );
-        stmt.finalize();
-      });
+    ]);
 
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
@@ -199,7 +194,7 @@ const run = async () => {
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
       console.log("🗑️ Cleaning DB.");
-      db.run("DELETE FROM npois");
+      db.run(`DELETE FROM ${name}`);
     }
   });
 };

@@ -7,7 +7,7 @@ import { checkBlock, NPOIS_QUERY } from "./utils";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const compareAttestations = async (logger: Logger) => {
   const db = openDb(
-    "/usr/app/dist/src/examples/poi-crosschecker/npois.db",
+    "/usr/app/dist/src/examples/poi-crosschecker/poi_crosschecker.db",
     logger
   );
 
