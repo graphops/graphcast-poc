@@ -1,5 +1,5 @@
 import { NPOIRecord } from "./../../types";
-import { sleep, sortAttestations } from "./../../utils";
+import { DB_NAME, DOMAIN, openDb, sleep, sortAttestations } from "./../../utils";
 import { createLogger, Logger } from "@graphprotocol/common-ts";
 import { processAttestations } from "../../utils";
 
@@ -18,16 +18,18 @@ const setup = async () => {
     level: "fatal",
   });
 
-  db = new sqlite3.Database(":memory:", [sqlite3.OPEN_READWRITE]);
+  db = new sqlite3.Database(":memory:", [sqlite3.OPEN_READWRITE])
+
   db.run(
-    "CREATE TABLE IF NOT EXISTS poi_crosschecker (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)"
+    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
   );
-  db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+  db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
     "Qmaaa",
     0,
     "0x0",
     "operator1",
     1,
+    Date.now()
   ]);
 };
 
@@ -51,24 +53,26 @@ describe("Radio helpers", () => {
       expect(diverged).toHaveLength(0);
 
       // another operator at different block, no diverged
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+      db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         1,
         "0x0",
         "operator2",
         1,
+        Date.now(),
       ]);
       const diverged2 = processAttestations(logger, 1, "operator1", db);
 
       expect(diverged2).toHaveLength(0);
 
       // another operator with same nPOI, no diverged
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+      db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         0,
         "0x0",
         "operator2",
         1,
+        Date.now(),
       ]);
       const diverged3 = processAttestations(logger, 1, "operator1", db);
       expect(diverged3).toHaveLength(0);
@@ -76,36 +80,39 @@ describe("Radio helpers", () => {
 
     test("add attacks", async () => {
       // different block
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+      db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         1,
         "0x1",
         "operator2",
         1,
+        Date.now(),
       ]);
 
       const diverged = processAttestations(logger, 1, "operator1", db);
       expect(diverged).toHaveLength(0);
 
       // same block, weak stake attack => no diverge
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+      db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         0,
         "0x1",
         "operator2",
         1,
+        Date.now(),
       ]);
 
       const diverged2 = processAttestations(logger, 1, "operator1", db);
       expect(diverged2).toHaveLength(0);
 
       // same block, strong friend => no diverge
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [
+      db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         0,
         "0x1",
         "operator2",
         2,
+        Date.now(),
       ]);
 
       const diverged3 = processAttestations(logger, 0, "operator1", db);
