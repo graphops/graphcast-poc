@@ -1,5 +1,5 @@
 import { NPOIRecord } from "./../../types";
-import { DB_NAME, DOMAIN, openDb, sleep, sortAttestations } from "./../../utils";
+import { sleep, sortAttestations } from "./../../utils";
 import { createLogger, Logger } from "@graphprotocol/common-ts";
 import { processAttestations } from "../../utils";
 
