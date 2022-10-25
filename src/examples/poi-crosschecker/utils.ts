@@ -19,7 +19,7 @@ export const processAttestations = (
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
-    "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM poi_crosschecker WHERE block = ?",
+    `SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM ${TABLE_NAME} WHERE block = ?`,
     targetBlock,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, rows: NPOIRecord[]) => {
@@ -111,3 +111,7 @@ export const openDb = (dbName: string, logger: Logger) => {
     }
   );
 };
+
+export const DOMAIN = "poi-crosschecker";
+export const DB_NAME = "poi_crosschecker";
+export const TABLE_NAME = "nonces";

@@ -20,7 +20,7 @@ let types: Array<{
 const setup = async () => {
   jest.spyOn(console, "error").mockImplementation(jest.fn());
   const logger = createLogger({
-    name: `poi-crosschecker`,
+    name: `poi_crosschecker`,
     async: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     level: "fatal",

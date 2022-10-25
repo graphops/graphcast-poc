@@ -9,7 +9,7 @@ echo "⌛ Waiting for containers to be running and messages to start flowing."
 
 while :;
 do
-    docker exec -it graphcast-poc-mock-indexer-1-1 sqlite3 poi-crosschecker.db "select * from npois;" ".exit" > db.log
+    docker exec -it graphcast-poc-mock-indexer-1-1 sqlite3 poi_crosschecker.db "select * from npois;" ".exit" > db.log
     if [ $(wc -l < db.log) -gt 2 ]; then
         sleep 3
         docker exec -it graphcast-poc-mock-indexer-1-1 node tests/integration/integrationTests.js containers=$containers

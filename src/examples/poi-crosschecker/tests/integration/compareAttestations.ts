@@ -1,13 +1,13 @@
 import { Logger } from "@graphprotocol/common-ts";
 import diff from "deep-diff";
-import { openDb } from "../../utils";
+import { DB_NAME, openDb } from "../../utils";
 import { AbstractNPOIRecord } from "./types";
 import { checkBlock, NPOIS_QUERY } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const compareAttestations = async (logger: Logger) => {
   const db = openDb(
-    "/usr/app/dist/src/examples/poi-crosschecker/poi_crosschecker.db",
+    `/usr/app/dist/src/examples/poi-crosschecker/${DB_NAME}.db`,
     logger
   );
 

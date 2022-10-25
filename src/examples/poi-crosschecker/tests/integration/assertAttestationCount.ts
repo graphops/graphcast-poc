@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import { Logger } from "@graphprotocol/common-ts";
-import { openDb } from "../../utils";
+import { DB_NAME, openDb } from "../../utils";
 import { AbstractNPOIRecord } from "./types";
 import { checkBlock, NPOIS_QUERY } from "./utils";
 
@@ -13,7 +13,7 @@ export const assertAttestationCount = async (
   logger.debug(`Containers: ${JSON.stringify(containers)}`);
 
   const db = openDb(
-    "/usr/app/dist/src/examples/poi-crosschecker/poi-crosschecker.db",
+    `/usr/app/dist/src/examples/poi-crosschecker/${DB_NAME}.db`,
     logger
   );
 
