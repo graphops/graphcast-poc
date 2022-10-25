@@ -126,7 +126,7 @@ export default class RadioFilter {
       });
       return 0;
     }
-    if (this.inconsistentNonce(sender, topic, nonce)) {
+    if (this.inconsistentNonce(sender, topic, nonce) && !process.env.TEST_ENVIRONMENT) {
       this.logger.warn(
         `👮 Inconsistent nonce or first time sender, drop message`,
         {

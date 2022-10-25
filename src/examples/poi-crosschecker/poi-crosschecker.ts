@@ -141,12 +141,7 @@ const run = async () => {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
-
-      logger.debug(`👀 SENDING`);
-      logger.debug(
-        `👀 Radio payload that we're about to send: ${radioPayload}`
-      );
-
+      
       const encodedMessage = await gossipAgent.messenger.writeMessage({
         radioPayload,
         types: RADIO_PAYLOAD_TYPES,
@@ -170,7 +165,7 @@ const run = async () => {
 
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
-        `/graphcast/0/${DOMAIN}/${ipfsHash}/proto`
+        `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${DOMAIN}/${ipfsHash}/proto`
       );
     });
 

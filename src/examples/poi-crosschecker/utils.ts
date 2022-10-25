@@ -114,4 +114,4 @@ export const openDb = (dbName: string, logger: Logger) => {
 
 export const DOMAIN = "poi-crosschecker";
 export const DB_NAME = "poi_crosschecker";
-export const TABLE_NAME = "nonces";
+export const TABLE_NAME = "npois";

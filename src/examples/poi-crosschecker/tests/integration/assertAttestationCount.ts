@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import { Logger } from "@graphprotocol/common-ts";
+import { NPOIRecord } from "../../types";
 import { DB_NAME, openDb } from "../../utils";
-import { AbstractNPOIRecord } from "./types";
-import { checkBlock, NPOIS_QUERY } from "./utils";
+import { checkBlock, dedupeRecords } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 export const assertAttestationCount = async (
@@ -20,19 +20,21 @@ export const assertAttestationCount = async (
   checkBlock(logger);
 
   db.all(
-    NPOIS_QUERY,
+    "SELECT * FROM npois",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (err: any, records: AbstractNPOIRecord[]) => {
+    (err: any, records: NPOIRecord[]) => {
       if (err) {
-        logger.error(JSON.stringify({ error: err.message }, null, "\t"));
+        logger.error(JSON.stringify({ error: err.message }));
       }
 
       if (records.length === 0) {
         logger.debug(`DB is empty.`);
       } else {
         const nonces = records.map((r) => r.nonce);
+        records = dedupeRecords(records, "operator");
+
         logger.debug(
-          `All records (before filtering): ${JSON.stringify(records)}`
+          `All records (deduped, before filtering): ${JSON.stringify(records)}`
         );
 
         const timestamp = new Date().getTime();
@@ -55,11 +57,11 @@ export const assertAttestationCount = async (
 
         records = records.filter((r) => r.block === closestAttestation.block);
         logger.debug(`Records length: ${records.length}`);
-        logger.debug(`Containers length: ${containers.length}`);
+        logger.debug(`Containers length: ${containers.length - 1}`);
 
         const hasEnoughRecords =
-          records.length >= Math.round(containers.length / 2);
-        logger.info(`Condition is met: ${hasEnoughRecords}`);
+          records.length >= Math.round((containers.length - 1) / 2);
+        logger.info(`Condition is met: ${hasEnoughRecords ? "yes ✅" : "no ❌"}`);
       }
     }
   );

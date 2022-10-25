@@ -1,5 +1,6 @@
 import { Logger } from "@graphprotocol/common-ts";
 import { ethers } from "ethers";
+import { NPOIRecord } from "../../types";
 import { sleep } from "../../utils";
 
 export const checkBlock = async (logger: Logger) => {
@@ -20,4 +21,6 @@ export const checkBlock = async (logger: Logger) => {
   }
 };
 
-export const NPOIS_QUERY = "SELECT subgraph, block, nPOI, nonce FROM npois";
+export const dedupeRecords = (arr: NPOIRecord[], key: string) => {
+  return [...new Map(arr.map(item => [item[key], item])).values()]
+}

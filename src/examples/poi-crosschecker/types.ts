@@ -25,4 +25,5 @@ export type NPOIRecord = {
   nPOI: string;
   operator: string;
   stakeWeight: number;
+  nonce: number;
 };

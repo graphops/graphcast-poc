@@ -21,7 +21,7 @@ export class GossipAgent {
   constructor(logger: Logger, clientManager: ClientManager) {
     this.messenger = new Messenger();
     this.observer = new Observer();
-    this.logger = logger.child({ component: 'gossipAgent' });
+    this.logger = logger.child({ component: "gossipAgent" });
     this.clientManager = clientManager;
 
     this.registry = this.clientManager.registry;
@@ -41,10 +41,8 @@ export class GossipAgent {
     this.messenger.init(this.logger, this.waku, this.clientManager);
     await this.observer.init(this.logger, this.waku, this.clientManager);
 
-    this.operator = this.clientManager.ethClient.getAddress().toLowerCase()
-    this.indexer = await this.radioFilter.fetchOperatorIndexer(
-      this.operator
-    ) 
+    this.operator = this.clientManager.ethClient.getAddress().toLowerCase();
+    this.indexer = await this.radioFilter.fetchOperatorIndexer(this.operator);
     return this.indexer;
   }
 
@@ -74,21 +72,29 @@ export class GossipAgent {
       blockNumber,
       sender,
       stakeWeight,
-      nonce
+      nonce,
     };
   }
 
-  async establishTopics(radio_application, fetch, handler){
+  async establishTopics(radio_application, fetch, handler) {
     // can generalize fetch or make it lambda
     const topics = await fetch(
-        this.logger,
-        this.clientManager.networkSubgraph,
-        this.indexer
-      );
-    
-    this.observer.observe(topics.map(
-      (topic: string) => `/graphcast/0/${radio_application}/${topic}/proto`
-    ), handler);
-    return topics
+      this.logger,
+      this.clientManager.networkSubgraph,
+      this.indexer
+    );
+
+    if (process.env.TEST_TOPIC) {
+      topics.push(process.env.TEST_TOPIC);
+    }
+
+    this.observer.observe(
+      topics.map(
+        (topic: string) =>
+          `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${radio_application}/${topic}/proto`
+      ),
+      handler
+    );
+    return topics;
   }
 }

@@ -1,8 +1,8 @@
 import { Logger } from "@graphprotocol/common-ts";
 import diff from "deep-diff";
+import { NPOIRecord } from "../../types";
 import { DB_NAME, openDb } from "../../utils";
-import { AbstractNPOIRecord } from "./types";
-import { checkBlock, NPOIS_QUERY } from "./utils";
+import { checkBlock, dedupeRecords } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const compareAttestations = async (logger: Logger) => {
@@ -14,15 +14,17 @@ export const compareAttestations = async (logger: Logger) => {
   checkBlock(logger);
 
   db.all(
-    NPOIS_QUERY,
+    "SELECT * FROM npois",
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (err: any, records: AbstractNPOIRecord[]) => {
+    (err: any, records: NPOIRecord[]) => {
       if (records.length === 0) {
         logger.debug(`DB is empty.`);
       } else {
         const nonces = records.map((r) => r.nonce);
+        records = dedupeRecords(records, "operator");
+
         logger.debug(
-          `All records (before filtering): ${JSON.stringify(records)}`
+          `All records (deduped, before filtering): ${JSON.stringify(records)}`
         );
 
         const timestamp = new Date().getTime();
@@ -55,7 +57,7 @@ export const compareAttestations = async (logger: Logger) => {
         });
 
         if (err) {
-          logger.error(JSON.stringify({ error: err.message }, null, "\t"));
+          logger.error(JSON.stringify({ error: err.message }));
         } else {
           const outerDiffs = [];
 
@@ -69,7 +71,7 @@ export const compareAttestations = async (logger: Logger) => {
           if (outerDiffs.length > 0) {
             logger.error(JSON.stringify(outerDiffs));
           } else {
-            logger.info("Compare attestations test passed. ✔️");
+            logger.info("Compare attestations test passed. ✅");
           }
         }
       }
