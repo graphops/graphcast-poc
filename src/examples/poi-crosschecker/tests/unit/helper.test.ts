@@ -23,6 +23,9 @@ const setup = async () => {
   db.run(
     "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
   );
+
+  await sleep(10);
+
   db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
     "Qmaaa",
     0,
