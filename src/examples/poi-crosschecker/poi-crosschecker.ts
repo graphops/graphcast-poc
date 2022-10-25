@@ -24,7 +24,6 @@ const run = async () => {
   });
 
   const db = new sqlite3.Database(
-    // const dbName = "/usr/app/dist/src/examples/poi-crosschecker/npois.db";
     `/usr/app/dist/src/examples/poi-crosschecker/${name}.db`,
     sqlite3.OPEN_READWRITE,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

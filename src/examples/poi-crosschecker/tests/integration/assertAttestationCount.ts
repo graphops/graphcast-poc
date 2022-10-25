@@ -13,7 +13,7 @@ export const assertAttestationCount = async (
   logger.debug(`Containers: ${JSON.stringify(containers)}`);
 
   const db = openDb(
-    "/usr/app/dist/src/examples/poi-crosschecker/npois.db",
+    "/usr/app/dist/src/examples/poi-crosschecker/poi-crosschecker.db",
     logger
   );
 
