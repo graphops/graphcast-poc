@@ -8,10 +8,12 @@
     "format": "prettier --write src/*",
     "build": "tsc -b",
     "watch": "tsc-watch --onSuccess \"npm start\"",
-    "test": "jest --colors --verbose --forceExit",
     "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js",
     "prepare": "husky install",
-    "test.integration": "bash src/examples/poi-crosschecker/tests/integration/scripts/compare-attestations.sh"
+    "start-mocked": "docker-compose up wiremock mock-indexer-1 mock-indexer-2 mock-indexer-3 mock-indexer-4 mock-indexer-5 mock-indexer-6 mock-indexer-7 mock-indexer-8",
+    "test": "jest --colors --verbose --forceExit",
+    "integration-tests": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests.sh",
+    "integration-tests.watch": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests-watch.sh"
   },
   "author": "axiomatic-aardvark",
   "license": "ISC",

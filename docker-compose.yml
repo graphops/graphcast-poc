@@ -6,12 +6,8 @@ services:
       context: .
       dockerfile: ./Dockerfile
     command: node poi-crosschecker.js
-    links:
-    - wiremock
     env_file:
       - .env
-    environment:
-      - REGISTRY_SUBGRAPH=http://host.docker.internal:8031/mock-registry-subgraph
 
   wiremock:
     image: wiremock/wiremock
@@ -23,20 +19,7 @@ services:
     ports:
       - 8031:8080
 
-  bad-indexer:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    links:
-      - wiremock
-    command: node poi-crosschecker.js
-    env_file:
-      - .test-env.conf
-    environment:
-      - RADIO_OPERATOR_PRIVATE_KEY=b48865ce8ba26a8cdc2ece89869992fcac7771cd4766dab870a860b273f3d332
-      - GRAPH_NODE=http://host.docker.internal:8031/mock-graph-node/graphql
-
-  indexer-3:
+  mock-indexer-1:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -46,7 +29,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=caf5c93f0c8aee3b945f33b9192014e83d50cec25f727a13460f6ef1eb6a5844
 
-  indexer-4:
+  mock-indexer-2:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -56,7 +39,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=703d5cca4201a89415448922df75af8c111aad8b12911d6331802b71ace37491
 
-  indexer-5:
+  mock-indexer-3:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -66,7 +49,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=e6246e05cf8c312877affb9977475f80247371d8632ffc7b80fa4afd5030ecb4
 
-  indexer-6:
+  mock-indexer-4:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -76,7 +59,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=ebb0ee3369bc93268f74bb9933483700f91ed169873844687b8a4dfd4629a7c7
 
-  indexer-7:
+  mock-indexer-5:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -86,7 +69,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=4025d593229ba51b11dbd24684c89b40983db2118f7d01f1c65d915ab79b61eb
 
-  indexer-8:
+  mock-indexer-6:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -96,7 +79,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=0a4d42a52629a497b9687620f2c6d60ff50abe45451d3b03d9a24e35025ba9fa
 
-  indexer-9:
+  mock-indexer-7:
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -106,7 +89,7 @@ services:
     environment:
       - RADIO_OPERATOR_PRIVATE_KEY=3d3410737e99ed8bdc823d100730d7084f9bab936170de088e863dc5fc5fbb1e
 
-  indexer-10:
+  mock-indexer-8:
     build:
       context: .
       dockerfile: ./Dockerfile

@@ -3,6 +3,9 @@ import "colors";
 import { NPOIRecord } from "./types";
 import { Logger } from "@graphprotocol/common-ts";
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+const sqlite3 = require("sqlite3").verbose();
+
 export const defaultModel = "default => 100000;";
 
 // TODO: update operator field in db to indexer
@@ -16,7 +19,7 @@ export const processAttestations = (
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
-    "SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM poi_crosschecker WHERE block = ?",
+    `SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM ${TABLE_NAME} WHERE block = ?`,
     targetBlock,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, rows: NPOIRecord[]) => {
@@ -95,3 +98,20 @@ export const sortAttestations = (records: NPOIRecord[]) => {
 export const sleep = (ms: number) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
+
+export const openDb = (dbName: string, logger: Logger) => {
+  return new sqlite3.Database(
+    dbName,
+    sqlite3.OPEN_READ,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (err: any) => {
+      if (err) {
+        logger.error(JSON.stringify({ error: err.message }, null, "\t"));
+      }
+    }
+  );
+};
+
+export const DOMAIN = "poi-crosschecker";
+export const DB_NAME = "poi_crosschecker";
+export const TABLE_NAME = "npois";

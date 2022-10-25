@@ -2,43 +2,50 @@ import { GossipAgent } from "./../../radio-clients/gossipAgent";
 import "colors";
 import "dotenv/config";
 import { ClientManager } from "../../radio-clients/clientManager";
-import { fetchAllocatedDeployments, fetchPOI, updateCostModel } from "./queries";
-import { defaultModel, processAttestations } from "./utils";
+import {
+  fetchAllocatedDeployments,
+  fetchPOI,
+  updateCostModel,
+} from "./queries";
+import {
+  DB_NAME,
+  defaultModel,
+  DOMAIN,
+  processAttestations,
+  TABLE_NAME,
+} from "./utils";
 import { createLogger } from "@graphprotocol/common-ts";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const sqlite3 = require("sqlite3").verbose();
-const name = `poi_crosschecker`;
 const RADIO_PAYLOAD_TYPES = [
   { name: "subgraph", type: "string" },
   { name: "nPOI", type: "string" },
 ];
 
-
 const run = async () => {
   const logger = createLogger({
-    name,
+    name: DOMAIN,
     async: false,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     level: process.env.logLevel as any,
   });
 
   const db = new sqlite3.Database(
-    // const dbName = "/usr/app/dist/src/examples/poi-crosschecker/npois.db";
-    `/usr/app/dist/src/examples/poi-crosschecker/${name}.db`,
+    `/usr/app/dist/src/examples/poi-crosschecker/${DB_NAME}.db`,
     sqlite3.OPEN_READWRITE,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any) => {
       if (err) {
         logger.error(err.message);
-        throw new Error(`Failed to connect to database ${name}`);
+        throw new Error(`Failed to connect to database ${DB_NAME}`);
       }
-      logger.info(`Connected to the ${name} database.`);
+      logger.info(`Connected to the ${DB_NAME} database.`);
     }
   );
 
   db.run(
-    `CREATE TABLE IF NOT EXISTS ${name} (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT)`
+    `CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)`
   );
 
   const clientManager = new ClientManager({
@@ -69,19 +76,34 @@ const run = async () => {
         types: RADIO_PAYLOAD_TYPES,
       });
 
-      const { radioPayload, blockNumber, sender, stakeWeight } = message;
+      const { radioPayload, blockNumber, sender, stakeWeight, nonce } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
       logger.info(`Payload: Subgraph (ipfs hash)`, { subgraph, nPOI });
 
-      db.run("INSERT INTO poi_crosschecker VALUES (?, ?, ?, ?, ?)", [subgraph, blockNumber, nPOI, sender, stakeWeight]);
+      db.run(`INSERT INTO ${TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)`, [
+        subgraph,
+        blockNumber,
+        nPOI,
+        sender,
+        stakeWeight,
+        nonce,
+      ]);
     } catch {
       logger.warn(`Failed to handle a message into attestation, moving on`);
     }
   };
 
   // Topic fetcher and handler for specific radio name (need a good name)
-  const deploymentIPFSs = await gossipAgent.establishTopics(name, fetchAllocatedDeployments, poiHandler);
+  const deploymentIPFSs = await gossipAgent.establishTopics(
+    DOMAIN,
+    fetchAllocatedDeployments,
+    poiHandler
+  );
+
+  if (process.env.TEST_TOPIC) {
+    deploymentIPFSs.push(process.env.TEST_TOPIC);
+  }
 
   logger.info(
     `👂 Initialize POI crosschecker for on-chain allocations with operator status:`,
@@ -119,7 +141,7 @@ const run = async () => {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
-
+      
       const encodedMessage = await gossipAgent.messenger.writeMessage({
         radioPayload,
         types: RADIO_PAYLOAD_TYPES,
@@ -132,16 +154,18 @@ const run = async () => {
         indexerAddress
       );
 
-      db.run(`INSERT INTO ${name} VALUES (?, ?, ?, ?, ?)`, [ipfsHash,
-          block,
-          localPOI,
-          gossipAgent.clientManager.ethClient.getAddress(),
-          selfStake
-    ]);
+      db.run(`INSERT INTO ${TABLE_NAME} VALUES (?, ?, ?, ?, ?, ?)`, [
+        ipfsHash,
+        block,
+        localPOI,
+        gossipAgent.clientManager.ethClient.getAddress(),
+        selfStake,
+        Date.now(),
+      ]);
 
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
-        `/graphcast/0/${name}/${ipfsHash}/proto`
+        `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${DOMAIN}/${ipfsHash}/proto`
       );
     });
 
@@ -158,6 +182,9 @@ const run = async () => {
     logger.debug(`🔗 ${block}`);
 
     if (block % 5 === 0) {
+      logger.info("🗑️ Cleaning DB.");
+      db.run(`DELETE FROM ${TABLE_NAME}`);
+
       // Going 5 blocks back as a buffer to make sure the node is fully synced
       sendNPOIs(block - 5, deploymentIPFSs);
       compareBlock = block + 3;
@@ -188,8 +215,6 @@ const run = async () => {
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?
-      console.log("🗑️ Cleaning DB.");
-      db.run(`DELETE FROM ${name}`);
     }
   });
 };
