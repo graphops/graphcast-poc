@@ -133,7 +133,7 @@ describe("Messenger and Observer helpers", () => {
       );
       expect(openedMessage).toHaveProperty(
         "sender",
-        "0x2bc5349585cbbf924026d25a520ffa9e8b51a39b"
+        "0xd8b0a336a27e57dd163d19e49bb153c631c49697"
       );
       // but cannot process because it is the first message
       expect(await gossipAgent.processMessage(args)).toBeUndefined();
