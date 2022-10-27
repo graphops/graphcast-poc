@@ -3,7 +3,7 @@
 ## 📯 Introduction
 This repo contains a POC for Graphcast,  as well as a single Radio example - a POI cross-checker. 
 
-The key requirement for an indexer to earn indexing rewards is to submit a valid Proof of Indexing promptly. The importance of valid POIs causes many indexers to alert each other on subgraph health in community discussions. To alleviate the indexer workload, this Radio can aggregate and exchange POI along with a list of indexer on-chain identities that can be used to trace reputations. With the pubsub pattern, the indexer can effectively automatically close an allocation when some trusted indexer(s) publishes a different POI or alert subgraph syncing failure. 
+The key requirement for an Indexer to earn indexing rewards is to submit a valid Proof of Indexing promptly. The importance of valid POIs causes many Indexers to alert each other on subgraph health in community discussions. To alleviate the Indexer workload, this Radio can aggregate and exchange POI along with a list of Indexer on-chain identities that can be used to trace reputations. With the pubsub pattern, the Indexer can effectively automatically close an allocation when some trusted Indexer(s) publishes a different POI or alert subgraph syncing failure. 
 
 ## 📝 Features
 - Showcases the Graphcast SDK with the help of a real-world example - a POI cross-checker
