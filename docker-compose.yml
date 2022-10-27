@@ -1,7 +1,15 @@
 version: "3.8"
 
 services:
-  indexer-1:
+  poi-crosschecker:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: node poi-crosschecker.js
+    env_file:
+      - .env
+
+  poi-crosschecker2:
     build:
       context: .
       dockerfile: ./Dockerfile

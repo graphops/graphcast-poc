@@ -39,7 +39,6 @@ export class GraphcastMessage {
     ) as unknown as GraphcastMessagePayload;
     if (!payload.radioPayload) {
       throw new Error("Radio payload is missing on decoded GraphcastMessage");
-      return;
     }
     return new GraphcastMessage(payload);
   }
