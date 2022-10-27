@@ -132,8 +132,8 @@ describe("Messenger and Observer helpers", () => {
         JSON.stringify(rawMessage_okay)
       );
       expect(openedMessage).toHaveProperty(
-        "sender",
-        "0xd8b0a336a27e57dd163d19e49bb153c631c49697"
+        "blockHash",
+        "0x0001"
       );
       // but cannot process because it is the first message
       expect(await gossipAgent.processMessage(args)).toBeUndefined();
