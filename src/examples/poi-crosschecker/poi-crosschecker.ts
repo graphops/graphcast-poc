@@ -89,8 +89,8 @@ const run = async () => {
         stakeWeight,
         nonce,
       ]);
-    } catch {
-      logger.warn(`Failed to handle a message into attestation, moving on`);
+    } catch (error) {
+      logger.warn(`Failed to handle a message into attestation, moving on`, {error});
     }
   };
 
@@ -165,7 +165,8 @@ const run = async () => {
 
       await gossipAgent.messenger.sendMessage(
         encodedMessage,
-        `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${DOMAIN}/${ipfsHash}/proto`
+        DOMAIN, 
+        ipfsHash
       );
     });
 
