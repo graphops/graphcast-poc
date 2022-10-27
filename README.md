@@ -37,6 +37,19 @@ Currently the only way to change the base configuration of the Graphcast SDK is 
 ## 🆕 Upgrading
 Updates to this POC will be merged into the `main` branch once their respective PR has been approved. The POC will not be distributed as a npm package or as releases on Github, since at this stage it is not recommended to be used in production.
 
+## 🧪 Testing
+There are unit tests both for the SDK and for the Radio, you can run them using `yarn test`.
+
+We've also set up a simple integration test pipeline that uses a bash script to spin up a few mocked Radio instances as well as one real one. It then hooks up to the real instance and runs the test files from there. In order to use that you will need to populate the `.test-env.conf` file and run the following command:
+```
+yarn integration-tests
+```
+
+Tip: For better log formatting, you can install pino-pretty globally using `npm i -g pino-pretty` and running the tests with this instead:
+```
+yarn integration-tests | pino-pretty -c -f
+```
+
 ## 🛠️ How it works
 There are two main components to this POC, one is the *base layer*, which will eventually be the core of the actual Graphcast SDK, the other one is an example of how to build on top of that base layer and create Radios. In this example, the Radio is a simple POI cross-checker. 
 
