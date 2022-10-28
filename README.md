@@ -26,18 +26,13 @@ To see the full idea behind Graphcast, you can check out the [GRC](https://forum
 docker-compose up poi-crosschecker
 ```
 
-If you're the only peer running that Radio (with that subgraph) you won't see much. That's why we've defined a second instance of the `poi-crosschecker`, called `poi-crosschecker-2`, that you can spin up alongside the main instance, essentially that way you're running two identical Radio instances, and you will see them messaging each other. You can do that with this command:
-```
-docker-compose up poi-crosschecker poi-crosschecker2
-```
-
 ## 🎚️ Configuring
 Currently the only way to change the base configuration of the Graphcast SDK is to change the environment variables in the `Dockerfile`.
 
 ## 🆕 Upgrading
 Updates to this POC will be merged into the `main` branch once their respective PR has been approved. The POC will not be distributed as a npm package or as releases on Github, since at this stage it is not recommended to be used in production.
 
-## 🧪 Testing
+## 🧪 Testing 
 There are unit tests both for the SDK and for the Radio, you can run them using `yarn test`.
 
 We've also set up a simple integration test pipeline that uses a bash script to spin up a few mocked Radio instances as well as one real one. It then hooks up to the real instance and runs the test files from there. In order to use that you will need to populate the `.test-env.conf` file and run the following command:
