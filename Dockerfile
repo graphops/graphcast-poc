@@ -15,7 +15,9 @@ WORKDIR /usr/app/dist/src/examples/poi-crosschecker
 
 ENV TERM "xterm-256color"
 ENV LOG_LEVEL "trace"
-ENV ETH_NODE "<ETH_NODE>"
 ENV REGISTRY_SUBGRAPH "https://api.thegraph.com/subgraphs/name/hopeyen/gossip-registry-test"
+ENV NETWORK_SUBGRAPH="https://gateway.testnet.thegraph.com/network"
+ENV INDEXER_MANAGEMENT_SERVER="http://host.docker.internal:18000"
+ENV GRAPH_NODE="http://host.docker.internal:8030/graphql"
 
 CMD node poi-crosschecker.js

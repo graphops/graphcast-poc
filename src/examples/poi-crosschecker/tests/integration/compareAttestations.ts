@@ -21,7 +21,7 @@ export const compareAttestations = async (logger: Logger) => {
         logger.debug(`DB is empty.`);
       } else {
         const nonces = records.map((r) => r.nonce);
-        records = dedupeRecords(records, "operator");
+        records = dedupeRecords(records, "indexer");
 
         logger.debug(
           `All records (deduped, before filtering): ${JSON.stringify(records)}`

@@ -21,7 +21,7 @@ const setup = async () => {
   db = new sqlite3.Database(":memory:", [sqlite3.OPEN_READWRITE])
 
   db.run(
-    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)"
+    "CREATE TABLE IF NOT EXISTS npois (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, indexer VARCHAR, stake_weight BIGINT, nonce BIGINT)"
   );
 
   await sleep(50);
@@ -30,7 +30,7 @@ const setup = async () => {
     "Qmaaa",
     0,
     "0x0",
-    "operator1",
+    "indexer1",
     1,
     Date.now()
   ]);
@@ -50,34 +50,34 @@ describe("Radio helpers", () => {
       const diverged = processAttestations(
         logger,
         targetBlock,
-        "operator1",
+        "indexer1",
         db
       );
       expect(diverged).toHaveLength(0);
 
-      // another operator at different block, no diverged
+      // another indexer at different block, no diverged
       db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         1,
         "0x0",
-        "operator2",
+        "indexer2",
         1,
         Date.now(),
       ]);
-      const diverged2 = processAttestations(logger, 1, "operator1", db);
+      const diverged2 = processAttestations(logger, 1, "indexer1", db);
 
       expect(diverged2).toHaveLength(0);
 
-      // another operator with same nPOI, no diverged
+      // another indexer with same nPOI, no diverged
       db.run("INSERT INTO npois VALUES (?, ?, ?, ?, ?, ?)", [
         "Qmaaa",
         0,
         "0x0",
-        "operator2",
+        "indexer2",
         1,
         Date.now(),
       ]);
-      const diverged3 = processAttestations(logger, 1, "operator1", db);
+      const diverged3 = processAttestations(logger, 1, "indexer1", db);
       expect(diverged3).toHaveLength(0);
     });
 
@@ -87,12 +87,12 @@ describe("Radio helpers", () => {
         "Qmaaa",
         1,
         "0x1",
-        "operator2",
+        "indexer2",
         1,
         Date.now(),
       ]);
 
-      const diverged = processAttestations(logger, 1, "operator1", db);
+      const diverged = processAttestations(logger, 1, "indexer1", db);
       expect(diverged).toHaveLength(0);
 
       // same block, weak stake attack => no diverge
@@ -100,12 +100,12 @@ describe("Radio helpers", () => {
         "Qmaaa",
         0,
         "0x1",
-        "operator2",
+        "indexer2",
         1,
         Date.now(),
       ]);
 
-      const diverged2 = processAttestations(logger, 1, "operator1", db);
+      const diverged2 = processAttestations(logger, 1, "indexer1", db);
       expect(diverged2).toHaveLength(0);
 
       // same block, strong friend => no diverge
@@ -113,12 +113,12 @@ describe("Radio helpers", () => {
         "Qmaaa",
         0,
         "0x1",
-        "operator2",
+        "indexer2",
         2,
         Date.now(),
       ]);
 
-      const diverged3 = processAttestations(logger, 0, "operator1", db);
+      const diverged3 = processAttestations(logger, 0, "indexer1", db);
 
       await sleep(50);
       expect(diverged3).toHaveLength(1);
@@ -131,7 +131,7 @@ describe("Radio helpers", () => {
           subgraph: "Qmaaa",
           block: 0,
           nPOI: "0x0",
-          operator: "operator0",
+          indexer: "indexer0",
           stakeWeight: 5,
           nonce: Date.now(),
         },
@@ -139,7 +139,7 @@ describe("Radio helpers", () => {
           subgraph: "Qmaaa",
           block: 0,
           nPOI: "0x1",
-          operator: "operator1",
+          indexer: "indexer1",
           stakeWeight: 3,
           nonce: Date.now(),
         },
@@ -147,7 +147,7 @@ describe("Radio helpers", () => {
           subgraph: "Qmaaa",
           block: 0,
           nPOI: "0x0",
-          operator: "operator2",
+          indexer: "indexer2",
           stakeWeight: 3,
           nonce: Date.now(),
         },
@@ -160,7 +160,7 @@ describe("Radio helpers", () => {
         subgraph: "Qmaaa",
         block: 0,
         nPOI: "0x2",
-        operator: "operator2",
+        indexer: "indexer2",
         stakeWeight: 6,
         nonce: Date.now(),
       });
@@ -172,7 +172,7 @@ describe("Radio helpers", () => {
         subgraph: "Qmaaa",
         block: 0,
         nPOI: "0x5",
-        operator: "operator2",
+        indexer: "indexer2",
         stakeWeight: 9,
         nonce: Date.now(),
       });
