@@ -45,7 +45,7 @@ const run = async () => {
   );
 
   db.run(
-    `CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, operator VARCHAR, stake_weight BIGINT, nonce BIGINT)`
+    `CREATE TABLE IF NOT EXISTS ${TABLE_NAME} (subgraph VARCHAR, block BIGINT, nPOI VARCHAR, indexer VARCHAR, stake_weight BIGINT, nonce BIGINT)`
   );
 
   const clientManager = new ClientManager({
@@ -85,7 +85,7 @@ const run = async () => {
         subgraph,
         blockNumber,
         nPOI,
-        sender,
+        indexerAddress,
         stakeWeight,
         nonce,
       ]);
@@ -158,7 +158,7 @@ const run = async () => {
         ipfsHash,
         block,
         localPOI,
-        gossipAgent.clientManager.ethClient.getAddress(),
+        indexerAddress,
         selfStake,
         Date.now(),
       ]);
@@ -200,7 +200,7 @@ const run = async () => {
         db
       );
       if (divergedDeployments.length > 0) {
-        logger.warn(`⚠️ Handle POI divergences to avoid query traffic`, {
+        logger.error(`⚠️ Handle POI divergences to avoid query traffic`, {
           divergedDeployments,
           defaultModel,
         });
@@ -212,6 +212,8 @@ const run = async () => {
             variables: null,
           })
         );
+      } else {
+        logger.info("No diverged deployments found! ✅");
       }
 
       //Q: change cost models dynamically. maybe output divergedDeployment?

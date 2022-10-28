@@ -10,7 +10,7 @@
     "watch": "tsc-watch --onSuccess \"npm start\"",
     "start": "node ./dist/src/examples/poi-crosschecker/poi-crosschecker.js",
     "prepare": "husky install",
-    "start-mocked": "docker-compose up wiremock mock-indexer-1 mock-indexer-2 mock-indexer-3 mock-indexer-4 mock-indexer-5 mock-indexer-6 mock-indexer-7 mock-indexer-8",
+    "start-mocked": "docker-compose up wiremock mock-instance-1 mock-instance-2 mock-instance-3 mock-instance-4 mock-instance-5 mock-instance-6 mock-instance-7 mock-instance-8",
     "test": "jest --colors --verbose --forceExit",
     "integration-tests": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests.sh",
     "integration-tests.watch": "bash ./src/examples/poi-crosschecker/tests/integration/scripts/integration-tests-watch.sh"

@@ -12,14 +12,14 @@ export const defaultModel = "default => 100000;";
 export const processAttestations = (
   logger: Logger,
   targetBlock: number,
-  operator: string,
+  indexer: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any
 ): string[] => {
   const divergedDeployments: string[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db.all(
-    `SELECT subgraph, block, nPOI, operator, stake_weight as stakeWeight FROM ${TABLE_NAME} WHERE block = ?`,
+    `SELECT subgraph, block, nPOI, indexer, stake_weight as stakeWeight FROM ${TABLE_NAME} WHERE block = ?`,
     targetBlock,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (err: any, rows: NPOIRecord[]) => {
@@ -27,7 +27,10 @@ export const processAttestations = (
         logger.error(`An error occurred: ${err.message}`);
       }
 
-      const localNPOIs = rows.filter((record) => record.operator === operator);
+      logger.info(`indexer ${indexer}`);
+      const localNPOIs = rows.filter(
+        (record) => record.indexer.toLowerCase() === indexer.toLowerCase()
+      );
 
       logger.debug("🔎 POIs", { localNPOIs, allnPOIs: rows, targetBlock });
 
@@ -49,7 +52,7 @@ export const processAttestations = (
           block: targetBlock,
           attestedNPOIs,
           mostStaked: topAttestation.nPOI,
-          indexerAddresses: topAttestation.operators,
+          indexerAddresses: topAttestation.indexers,
           nPOI: record.nPOI,
         });
 
@@ -81,12 +84,12 @@ export const sortAttestations = (records: NPOIRecord[]) => {
     const matchedGroup = groups.find((g) => g.nPOI === record.nPOI);
     if (matchedGroup) {
       matchedGroup.stakeWeight += record.stakeWeight;
-      matchedGroup.operators.push(record.operator);
+      matchedGroup.indexers.push(record.indexer);
     } else {
       groups.push({
         nPOI: record.nPOI,
         stakeWeight: record.stakeWeight,
-        operators: [record.operator],
+        indexers: [record.indexer],
       });
     }
   });

@@ -23,7 +23,7 @@ export type NPOIRecord = {
   subgraph: string;
   block: number;
   nPOI: string;
-  operator: string;
+  indexer: string;
   stakeWeight: number;
   nonce: number;
 };
