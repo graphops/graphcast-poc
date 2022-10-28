@@ -19,7 +19,7 @@ services:
     ports:
       - 8031:8080
 
-  divergent-instance:
+  mock-instance-1:
     build:
       context: .
       dockerfile: ./Dockerfile
