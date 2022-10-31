@@ -19,7 +19,7 @@ To see the full idea behind Graphcast, you can check out the [GRC](https://forum
 
 1. You have registered a Graphcast operator address. You can connect a operator address to your indexer address (with a 1:1 relationship) using our very own [Registry contract](https://goerli.etherscan.io/address/0x1e408c2cf66fd3afcea0f49dc44c9f4db5575e79) (on Goerli).
 1. You have a running **graph-node** instance with at least 1 fully synced subgraph.
-1. You've populated the environment variables in your `.env` file. As per the `.env.example` file, you only need to specify `ETH_NODE` and `RADIO_OPERATOR_PRIVATE_KEY`.
+1. You've populated the environment variables in your `.env` file. As per the `.env.example` file, you will need to specify `ETH_NODE`, `RADIO_OPERATOR_PRIVATE_KEY`, `NETWORK_SUBGRAPH`, `INDEXER_MANAGEMENT_SERVER` and `GRAPH_NODE`.
 1. Have `typescript` installed globally.
 1. Have a Docker daemon running (Docker Desktop if you're on macOS).
 
