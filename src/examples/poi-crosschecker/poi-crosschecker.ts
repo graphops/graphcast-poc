@@ -23,14 +23,14 @@ const RADIO_PAYLOAD_TYPES = [
   { name: "nPOI", type: "string" },
 ];
 
-const run = async () => {
-  const logger = createLogger({
-    name: DOMAIN,
-    async: false,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    level: process.env.logLevel as any,
-  });
+const logger = createLogger({
+  name: DOMAIN,
+  async: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  level: process.env.logLevel as any,
+});
 
+const run = async () => {
   const db = new sqlite3.Database(
     `/usr/app/dist/src/examples/poi-crosschecker/${DB_NAME}.db`,
     sqlite3.OPEN_READWRITE,
@@ -76,7 +76,7 @@ const run = async () => {
         types: RADIO_PAYLOAD_TYPES,
       });
 
-      const { radioPayload, blockNumber, sender, stakeWeight, nonce } = message;
+      const { radioPayload, blockNumber, stakeWeight, nonce } = message;
       const { nPOI, subgraph } = JSON.parse(radioPayload);
 
       logger.info(`Payload: Subgraph (ipfs hash)`, { subgraph, nPOI });
@@ -90,15 +90,17 @@ const run = async () => {
         nonce,
       ]);
     } catch (error) {
-      logger.warn(`Failed to handle a message into attestation, moving on`, {error});
+      logger.warn(`Failed to handle a message into attestation, moving on`, {
+        error,
+      });
     }
   };
 
   // Topic fetcher and handler for specific radio name (need a good name)
   const deploymentIPFSs = await gossipAgent.establishTopics(
     DOMAIN,
-    fetchAllocatedDeployments,
-    poiHandler
+    poiHandler,
+    fetchAllocatedDeployments
   );
 
   if (process.env.TEST_TOPIC) {
@@ -141,7 +143,7 @@ const run = async () => {
         subgraph: ipfsHash,
         nPOI: localPOI,
       };
-      
+
       const encodedMessage = await gossipAgent.messenger.writeMessage({
         radioPayload,
         types: RADIO_PAYLOAD_TYPES,
@@ -163,11 +165,7 @@ const run = async () => {
         Date.now(),
       ]);
 
-      await gossipAgent.messenger.sendMessage(
-        encodedMessage,
-        DOMAIN, 
-        ipfsHash
-      );
+      await gossipAgent.messenger.sendMessage(encodedMessage, DOMAIN, ipfsHash);
     });
 
     if (unavailableDplymts.length > 0) {
@@ -225,6 +223,6 @@ const run = async () => {
 run()
   .then()
   .catch((err) => {
-    console.error(`❌ Oh no! An error occurred: ${err.message}`.red);
+    logger.error(`❌ Oh no! An error occurred: ${err.message}`.red);
     process.exit(1);
   });

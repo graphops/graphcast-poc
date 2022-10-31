@@ -1,6 +1,14 @@
 version: "3.8"
 
 services:
+  ping-pong:
+    build:
+      context: .
+      dockerfile: ./pingpong.Dockerfile
+    command: node index.js
+    env_file:
+      - .env
+
   poi-crosschecker:
     build:
       context: .
