@@ -5,7 +5,7 @@ import RadioFilter from "../radio-common/customs";
 import { ethers } from "ethers";
 import { GraphcastMessage } from "../radio-common/graphcastMessage";
 import { ReadMessageArgs } from "../radio-common/types";
-import { Logger, createLogger } from "@graphprotocol/common-ts";
+import { Logger } from "@graphprotocol/common-ts";
 
 export class Observer {
   wakuInstance: Waku;
@@ -43,7 +43,7 @@ export class Observer {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async readMessage(args: ReadMessageArgs) {
-    const { msg, topic, types } = args;
+    const { msg, types } = args;
 
     try {
       const message = this._decodeMessage(msg, types);

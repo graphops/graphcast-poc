@@ -76,25 +76,38 @@ export class GossipAgent {
     };
   }
 
-  async establishTopics(radio_application, fetch, handler) {
+  async establishTopics(radio_application, handler, fetch?) {
     // can generalize fetch or make it lambda
-    const topics = await fetch(
-      this.logger,
-      this.clientManager.networkSubgraph,
-      this.indexer
-    );
+    const topics = fetch
+      ? await fetch(
+          this.logger,
+          this.clientManager.networkSubgraph,
+          this.indexer
+        )
+      : [];
 
     if (process.env.TEST_TOPIC) {
       topics.push(process.env.TEST_TOPIC);
     }
 
-    this.observer.observe(
-      topics.map(
-        (topic: string) =>
-          `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${radio_application}/${topic}/proto`
-      ),
-      handler
-    );
+    if (topics.length > 0) {
+      this.observer.observe(
+        topics.map((topic: string) => {
+          const graphcastTopic = `/graphcast${
+            process.env.TEST_ENVIRONMENT ? "-test" : ""
+          }/0/${radio_application}/${topic}/proto`;
+
+          return graphcastTopic;
+        }),
+        handler
+      );
+    } else {
+      const graphcastTopic = `/graphcast${
+        process.env.TEST_ENVIRONMENT ? "-test" : ""
+      }/0/${radio_application}/proto`;
+      this.observer.observe([graphcastTopic], handler);
+    }
+
     return topics;
   }
 }

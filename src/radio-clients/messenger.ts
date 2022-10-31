@@ -46,8 +46,16 @@ export class Messenger {
     }
   }
 
-  async sendMessage(encodedMessage: Uint8Array, topic: string, subtopic: string) {
-    const msg = await WakuMessage.fromBytes(encodedMessage, `/graphcast${process.env.TEST_ENVIRONMENT ? "-test" : ""}/0/${topic}/${subtopic}/proto`);
+  async sendMessage(
+    encodedMessage: Uint8Array,
+    topic: string,
+    subtopic?: string
+  ) {
+    const constructedTopic = `/graphcast${
+      process.env.TEST_ENVIRONMENT ? "-test" : ""
+    }/0/${topic}/${subtopic ? subtopic + "/" : ""}proto`;
+
+    const msg = await WakuMessage.fromBytes(encodedMessage, constructedTopic);
     await this.wakuInstance.relay.send(msg);
   }
 }
