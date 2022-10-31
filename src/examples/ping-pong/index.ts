@@ -24,21 +24,19 @@ const run = async () => {
   });
 
   const gossipAgent = new GossipAgent(logger, clientManager);
+
   const indexerAddress = await gossipAgent.init();
 
   logger.info(
     `🔦 Radio operator resolved to indexer address ${indexerAddress}`
   );
 
-  logger.info(
-    `👂 Initialize POI crosschecker for on-chain allocations with operator status: `,
-    {
-      indexerAddress:
-        indexerAddress ??
-        "Graphcast agent is not registered as an indexer operator",
-      topic: DOMAIN,
-    }
-  );
+  logger.info(`👂 Initialize ping pong Radio with operator status: `, {
+    indexerAddress:
+      indexerAddress ??
+      "Graphcast agent is not registered as an indexer operator",
+    topic: DOMAIN,
+  });
 
   const sendMessage = async (radioPayload) => {
     const provider = gossipAgent.clientManager.ethClient.provider;
