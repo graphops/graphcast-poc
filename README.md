@@ -1,5 +1,9 @@
 # Graphcast POC
 
+## Deprecated
+
+This Proof of Concept in TypeScript has been deprecated in favour of the Rust implementation of Graphcast. Please see the [documentation](https://docs.graphops.xyz/graphcast/intro) for more information.
+
 ## 📯 Introduction
 
 This repo contains a POC for Graphcast, as well as a single Radio example - a POI cross-checker.
